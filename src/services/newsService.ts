@@ -86,7 +86,7 @@ export const newsService = {
         liveStartTime: news.type === 'live' && news.liveStartTime 
           ? Timestamp.fromDate(news.liveStartTime) 
           : undefined,
-        publishDate: Timestamp.fromDate(news.publishDate),
+        publishDate: news.publishDate ? Timestamp.fromDate(news.publishDate) : Timestamp.fromDate(new Date()),
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
       });

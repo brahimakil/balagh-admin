@@ -32,7 +32,7 @@ const Activities: React.FC = () => {
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
-  const [translating, setTranslating] = useState<{[key: string]: boolean}>({});
+  const [translating, setTranslating] = useState<string>('');
 
   const { canAccessActivityType, currentUser, currentUserData } = useAuth();
 
@@ -268,7 +268,6 @@ const Activities: React.FC = () => {
     const currentYear = selectedDate.getFullYear();
     
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
     const startDate = new Date(firstDayOfMonth);
     startDate.setDate(startDate.getDate() - firstDayOfMonth.getDay());
     
@@ -428,7 +427,7 @@ const Activities: React.FC = () => {
                   className={`calendar-day ${day.isCurrentMonth ? 'current-month' : 'other-month'} ${day.isToday ? 'today' : ''}`}
                   onClick={() => {
                     setSelectedDate(day.date);
-                    setFormData(prev => ({ ...prev, date: day.date }));
+                    setFormData(prev => ({ ...prev, date: day.date.toISOString().split('T')[0] }));
                     setShowForm(true);
                   }}
                 >

@@ -6,7 +6,7 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { usersService, type User, type UserPermissions } from '../services/usersService';
 

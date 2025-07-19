@@ -125,8 +125,9 @@ export const generatePrintQualityQRCode = async (
         dark: '#000000',
         light: '#FFFFFF'
       }
-    }, (err) => {
+    }, (err: any) => {
       if (err) {
+        console.error('QR Code generation error:', err);
         reject(err);
         return;
       }

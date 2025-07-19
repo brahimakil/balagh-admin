@@ -85,7 +85,7 @@ const Notifications: React.FC = () => {
           </div>
         ) : (
           notifications.map((notification) => {
-            const isUnread = !notification.readBy?.includes(currentUser?.email);
+            const isUnread = !notification.readBy?.includes(currentUser?.email || '');
             
             return (
               <div

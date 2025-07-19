@@ -82,8 +82,8 @@ const Admins: React.FC = () => {
       permissions: {
         ...prev.permissions,
         allowedActivityTypes: checked
-          ? [...prev.permissions.allowedActivityTypes, activityTypeId]
-          : prev.permissions.allowedActivityTypes.filter(id => id !== activityTypeId)
+          ? [...(prev.permissions.allowedActivityTypes || []), activityTypeId]
+          : (prev.permissions.allowedActivityTypes || []).filter(id => id !== activityTypeId)
       }
     }));
   };
@@ -493,7 +493,7 @@ const Admins: React.FC = () => {
                             <label className="permission-checkbox">
                               <input
                                 type="checkbox"
-                                checked={formData.permissions.allowedActivityTypes.length === 0}
+                                checked={(formData.permissions.allowedActivityTypes || []).length === 0}
                                 onChange={(e) => {
                                   if (e.target.checked) {
                                     handleInputChange('permissions.allowedActivityTypes', []);
@@ -506,7 +506,7 @@ const Admins: React.FC = () => {
                               <label key={activityType.id} className="permission-checkbox">
                                 <input
                                   type="checkbox"
-                                  checked={formData.permissions.allowedActivityTypes.includes(activityType.id!)}
+                                  checked={(formData.permissions.allowedActivityTypes || []).includes(activityType.id!)}
                                   onChange={(e) => handleActivityTypePermission(activityType.id!, e.target.checked)}
                                 />
                                 {activityType.nameEn}

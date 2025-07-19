@@ -21,7 +21,7 @@ import Settings from '../pages/Settings';
 const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { hasPermission, currentAdmin } = useAuth();
+  const { hasPermission, currentUserData } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Get current page from URL
@@ -39,7 +39,7 @@ const AdminLayout: React.FC = () => {
 
   // Check permissions and redirect if necessary
   useEffect(() => {
-    if (currentAdmin) {
+    if (currentUserData) {
       const currentPage = getCurrentPage();
       
       // Map URL paths to permission names
@@ -61,7 +61,7 @@ const AdminLayout: React.FC = () => {
       
       if (requiredPermission && !hasPermission(requiredPermission)) {
         // Find the first page the user has permission to access
-        const allowedPages = Object.entries(pagePermissions).find(([page, permission]) => 
+        const allowedPages = Object.entries(pagePermissions).find(([, permission]) => 
           hasPermission(permission)
         );
         
@@ -73,7 +73,7 @@ const AdminLayout: React.FC = () => {
         }
       }
     }
-  }, [currentAdmin, location, hasPermission, navigate]);
+  }, [currentUserData, location, hasPermission, navigate]);
 
   // Close mobile menu when screen size changes
   useEffect(() => {

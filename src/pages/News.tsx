@@ -14,7 +14,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
   const [editingNews, setEditingNews] = useState<News | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [translating, setTranslating] = useState('');
+  const [translating, setTranslating] = useState<string>('');
 
   // Form state
   const [formData, setFormData] = useState({
