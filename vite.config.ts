@@ -5,6 +5,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    historyApiFallback: true,
+    historyApiFallback: true, // This handles client-side routing
+  },
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'UNUSED_EXTERNAL_IMPORT') return
+        warn(warning)
+      }
+    }
   }
 })
