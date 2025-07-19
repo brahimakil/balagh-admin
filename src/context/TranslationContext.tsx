@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface TranslationContextType {
   currentLanguage: 'en' | 'ar';
-  toggleLanguage: () => void;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -10,81 +9,37 @@ const TranslationContext = createContext<TranslationContextType | undefined>(und
 export const useTranslation = () => {
   const context = useContext(TranslationContext);
   if (context === undefined) {
-    throw new Error('useTranslation must be used within a TranslationProvider');
+    throw new error('useTranslation must be used within a TranslationProvider');
   }
   return context;
 };
 
-declare global {
-  interface Window {
-    google: any;
-    googleTranslateElementInit: () => void;
-  }
-}
-
 export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState<'en' | 'ar'>('en');
 
-  // Initialize Google Translate
+  // Detect when Google Translate changes the language
   useEffect(() => {
-    // Define the initialization function
-    window.googleTranslateElementInit = () => {
-      new window.google.translate.TranslateElement(
-        {
-          pageLanguage: 'en',
-          includedLanguages: 'en,ar',
-          layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE
-        },
-        'google_translate_element'
-      );
-    };
+    const observer = new MutationObserver(() => {
+      const body = document.body;
+      if (body.classList.contains('goog-te-rtl')) {
+        setCurrentLanguage('ar');
+        document.documentElement.setAttribute('dir', 'rtl');
+      } else {
+        setCurrentLanguage('en');
+        document.documentElement.setAttribute('dir', 'ltr');
+      }
+    });
 
-    // Load the Google Translate script
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-    document.head.appendChild(script);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
 
-    // Cleanup function
-    return () => {
-      const scripts = document.querySelectorAll('script[src*="translate.google.com"]');
-      scripts.forEach(script => script.remove());
-    };
+    return () => observer.disconnect();
   }, []);
 
-  // Apply RTL when Arabic is selected
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    
-    if (currentLanguage === 'ar') {
-      html.setAttribute('dir', 'rtl');
-      html.setAttribute('lang', 'ar');
-      body.classList.add('rtl-layout');
-    } else {
-      html.setAttribute('dir', 'ltr');
-      html.setAttribute('lang', 'en');
-      body.classList.remove('rtl-layout');
-    }
-  }, [currentLanguage]);
-
-  const toggleLanguage = () => {
-    const newLanguage = currentLanguage === 'en' ? 'ar' : 'en';
-    setCurrentLanguage(newLanguage);
-    
-    // Trigger Google Translate
-    setTimeout(() => {
-      const selectElement = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-      if (selectElement) {
-        selectElement.value = newLanguage;
-        selectElement.dispatchEvent(new Event('change'));
-      }
-    }, 100);
-  };
-
   const value = {
-    currentLanguage,
-    toggleLanguage
+    currentLanguage
   };
 
   return (
