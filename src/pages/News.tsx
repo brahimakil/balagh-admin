@@ -108,9 +108,14 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     try {
       setLoading(true);
       
+      // Combine publish date and time to create full datetime
+      const publishDateTime = new Date(`${formData.publishDate}T${formData.publishTime}`);
+      
       const newsData = {
         ...formData,
-        publishDate: new Date(formData.publishDate),
+        publishDate: publishDateTime,
+        // For live news, set liveStartTime to current time when editing or creating
+        liveStartTime: formData.type === 'live' ? new Date() : undefined,
         liveDurationHours: formData.type === 'live' ? Number(formData.liveDurationHours) : undefined,
       };
 
@@ -158,32 +163,12 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     setSuccess('');
   };
 
-  // Update the handleEdit function to properly handle Firestore Timestamps
-
+  // Update the handleEdit function to use current date/time
   const handleEdit = (newsItem: News) => {
-    // Handle publishDate - could be Date object, Timestamp, or undefined
-    let publishDate: string;
-    if (newsItem.publishDate) {
-      // Check if it's a Firestore Timestamp with toDate() method
-      if (typeof newsItem.publishDate === 'object' && 'toDate' in newsItem.publishDate) {
-        publishDate = (newsItem.publishDate as any).toDate().toISOString().split('T')[0];
-      } 
-      // Check if it's already a Date object
-      else if (newsItem.publishDate instanceof Date) {
-        publishDate = newsItem.publishDate.toISOString().split('T')[0];
-      }
-      // Fallback
-      else {
-        publishDate = new Date().toISOString().split('T')[0];
-      }
-    } else {
-      // Default to today if undefined
-      publishDate = new Date().toISOString().split('T')[0];
-    }
-      
-    const publishTime = newsItem.publishTime 
-      ? newsItem.publishTime
-      : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    // Always use current date and time when editing
+    const now = new Date();
+    const publishDate = now.toISOString().split('T')[0];
+    const publishTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
     setFormData({
       titleEn: newsItem.titleEn,
@@ -193,8 +178,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       type: newsItem.type,
       liveDurationHours: newsItem.liveDurationHours || 2,
       mainImage: newsItem.mainImage,
-      publishDate,
-      publishTime
+      publishDate, // Always current date
+      publishTime  // Always current time
     });
     setImagePreview(newsItem.mainImage);
     setEditingNews(newsItem);
