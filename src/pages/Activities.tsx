@@ -3,6 +3,7 @@ import { activitiesService, type Activity } from '../services/activitiesService'
 import { activityTypesService, type ActivityType } from '../services/activityTypesService';
 import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
+import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
 
 const Activities: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -33,6 +34,9 @@ const Activities: React.FC = () => {
 
   const [imagePreview, setImagePreview] = useState<string>('');
   const [translating, setTranslating] = useState<string>('');
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const { canAccessActivityType, currentUser, currentUserData } = useAuth();
 
@@ -102,53 +106,63 @@ const Activities: React.FC = () => {
 
     try {
       setLoading(true);
+      setUploading(true);
       
-      // Convert date string to Date object
+      const now = new Date();
+      const activityDateTime = new Date(formData.date + 'T' + formData.time);
+      const activityEndTime = new Date(activityDateTime);
+      activityEndTime.setHours(activityEndTime.getHours() + Number(formData.durationHours));
+      
+      let finalIsActive = formData.isActive;
+      let finalIsManuallyReactivated = false;
+      
+      if (formData.isActive) {
+        // Force Active is checked - override timing, always active
+        finalIsActive = true;
+        finalIsManuallyReactivated = true;
+      } else {
+        // Force Active is unchecked - follow auto timing
+        finalIsActive = now >= activityDateTime && now < activityEndTime;
+        finalIsManuallyReactivated = false;
+      }
+      
       const activityData = {
         ...formData,
-        date: new Date(formData.date), // Convert string to Date
-        durationHours: Number(formData.durationHours) // Ensure it's a number
+        date: new Date(formData.date),
+        durationHours: Number(formData.durationHours),
+        isActive: finalIsActive,
+        isManuallyReactivated: finalIsManuallyReactivated,
       };
-
-      // If editing and user is manually reactivating after expiration
-      if (editingActivity && formData.isActive && !editingActivity.isActive) {
-        const now = new Date();
-        const activityDateTime = new Date(editingActivity.date);
-        const [hours, minutes] = editingActivity.time.split(':');
-        activityDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        const activityEndTime = new Date(activityDateTime);
-        activityEndTime.setHours(activityEndTime.getHours() + editingActivity.durationHours);
-        
-        // If current time is past the original end time, mark as manually reactivated
-        if (now >= activityEndTime) {
-          activityData.isManuallyReactivated = true;
-        }
-      }
 
       if (editingActivity) {
         await activitiesService.updateActivity(
           editingActivity.id!, 
           activityData as Activity, 
           currentUser?.email, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined
         );
         setSuccess('Activity updated successfully');
       } else {
         await activitiesService.addActivity(
-          activityData as Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, 
+          { ...activityData, photos: [], videos: [] } as Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, 
           currentUser?.email!, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined
         );
         setSuccess('Activity added successfully');
       }
       
       resetForm();
-      loadData();
+      await loadData(); // Make sure this waits for the data to load
     } catch (error) {
       console.error('Error saving activity:', error);
       setError('Failed to save activity');
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -172,18 +186,47 @@ const Activities: React.FC = () => {
     setShowForm(false);
     setError('');
     setSuccess('');
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
   };
 
-  const handleEdit = (activity: Activity) => {
-    setFormData({
-      ...activity,
-      date: activity.date.toISOString().split('T')[0], // Convert Date to string for form
-      durationHours: activity.durationHours || 24, // Ensure duration has a value
-      isManuallyReactivated: activity.isManuallyReactivated || false
-    });
-    setImagePreview(activity.mainImage);
-    setEditingActivity(activity);
-    setShowForm(true);
+  const handleEdit = async (activity: Activity) => {
+    try {
+      // Fetch the latest activity data to ensure we have updated photos/videos
+      const latestActivity = await activitiesService.getActivity(activity.id!);
+      const activityToEdit = latestActivity || activity;
+      
+      setFormData({
+        ...activityToEdit,
+        date: activityToEdit.date.toISOString().split('T')[0],
+        durationHours: activityToEdit.durationHours || 24,
+        isManuallyReactivated: activityToEdit.isManuallyReactivated || false,
+        isActive: activityToEdit.isManuallyReactivated || false // Only show Force Active as checked if it's manually reactivated
+      });
+      setImagePreview(activityToEdit.mainImage);
+      
+      // Clear any previously selected files
+      setSelectedPhotos([]);
+      setSelectedVideos([]);
+      
+      setEditingActivity(activityToEdit);
+      setShowForm(true);
+    } catch (error) {
+      console.error('Error fetching latest activity data:', error);
+      // Fallback to using the passed activity data
+      setFormData({
+        ...activity,
+        date: activity.date.toISOString().split('T')[0],
+        durationHours: activity.durationHours || 24,
+        isManuallyReactivated: activity.isManuallyReactivated || false,
+        isActive: activity.isManuallyReactivated || false // Only show Force Active as checked if it's manually reactivated
+      });
+      setImagePreview(activity.mainImage);
+      setSelectedPhotos([]);
+      setSelectedVideos([]);
+      setEditingActivity(activity);
+      setShowForm(true);
+    }
   };
 
   const handleDelete = async (id: string, activityName: string) => {
@@ -219,6 +262,84 @@ const Activities: React.FC = () => {
         setImagePreview(base64String);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only image files for photos');
+      e.target.value = ''; // Clear the input
+      return;
+    }
+    
+    setSelectedPhotos(prev => [...prev, ...validFiles]);
+    e.target.value = ''; // Clear the input to allow selecting the same file again
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('video/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only video files');
+      e.target.value = ''; // Clear the input
+      return;
+    }
+    
+    setSelectedVideos(prev => [...prev, ...validFiles]);
+    e.target.value = ''; // Clear the input to allow selecting the same file again
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeSelectedVideo = (index: number) => {
+    setSelectedVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingFile = async (activityId: string, file: UploadedFile, fileType: 'photos' | 'videos') => {
+    if (!window.confirm(`Are you sure you want to delete this ${fileType.slice(0, -1)}?`)) return;
+    
+    try {
+      setLoading(true);
+      await activitiesService.removeFiles(activityId, [file], fileType);
+      
+      if (editingActivity && editingActivity.id === activityId) {
+        const updatedFiles = editingActivity[fileType]?.filter(
+          existingFile => existingFile.url !== file.url
+        ) || [];
+        
+        setEditingActivity({
+          ...editingActivity,
+          [fileType]: updatedFiles
+        });
+      }
+      
+      setActivities(prevActivities => 
+        prevActivities.map(activity => {
+          if (activity.id === activityId) {
+            const updatedFiles = activity[fileType]?.filter(
+              existingFile => existingFile.url !== file.url
+            ) || [];
+            
+            return {
+              ...activity,
+              [fileType]: updatedFiles
+            };
+          }
+          return activity;
+        })
+      );
+      
+      setSuccess(`${fileType.slice(0, -1)} deleted successfully`);
+    } catch (error) {
+      setError(`Failed to delete ${fileType.slice(0, -1)}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -514,6 +635,15 @@ const Activities: React.FC = () => {
                 <div className="story-preview">
                   <p>{activity.descriptionEn.substring(0, 100)}{activity.descriptionEn.length > 100 ? '...' : ''}</p>
                 </div>
+                {/* Display media counts */}
+                <div className="media-counts">
+                  {activity.photos && activity.photos.length > 0 && (
+                    <span className="media-count">📷 {activity.photos.length}</span>
+                  )}
+                  {activity.videos && activity.videos.length > 0 && (
+                    <span className="media-count">🎥 {activity.videos.length}</span>
+                  )}
+                </div>
                 <div className="card-actions">
                   <button 
                     className="edit-btn"
@@ -663,31 +793,10 @@ const Activities: React.FC = () => {
                     Force Active Now
                   </label>
                   <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                    ℹ️ <strong>Unchecked (default):</strong> Activity follows schedule (starts at set time, ends after duration)<br/>
-                    <strong>Checked:</strong> Activity becomes active immediately, ignores start time, still expires after duration
+                    If checked: Override timing and make active immediately. If unchecked: Follow auto-timing schedule.
                   </small>
                   
-                  {/* Turn Off Active Button - Only show if editing and activity is currently active */}
-                  {editingActivity && formData.isActive && (
-                    <button
-                      type="button"
-                      className="turn-off-active-btn"
-                      onClick={() => handleTurnOffActive(editingActivity.id!)}
-                      style={{
-                        marginTop: '12px',
-                        padding: '8px 16px',
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}
-                    >
-                      🔴 Turn Off Active
-                    </button>
-                  )}
+              
                 </div>
               </div>
 
@@ -751,12 +860,140 @@ const Activities: React.FC = () => {
                 </div>
               </div>
 
+              {/* Photos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Photos</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="file-input"
+                  />
+                  
+                  {selectedPhotos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Photos ({selectedPhotos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedPhotos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={URL.createObjectURL(file)} 
+                              alt={`Preview ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedPhoto(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {editingActivity && editingActivity.photos && editingActivity.photos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Photos ({editingActivity.photos.length})</h4>
+                      <div className="preview-grid">
+                        {editingActivity.photos.map((photo, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={photo.url} 
+                              alt={`Photo ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingActivity.id!, photo, 'photos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{photo.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Videos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Videos</label>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={handleVideoUpload}
+                    className="file-input"
+                  />
+                  
+                  {selectedVideos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Videos ({selectedVideos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedVideos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={URL.createObjectURL(file)} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedVideo(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {editingActivity && editingActivity.videos && editingActivity.videos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Videos ({editingActivity.videos.length})</h4>
+                      <div className="preview-grid">
+                        {editingActivity.videos.map((video, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={video.url} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingActivity.id!, video, 'videos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{video.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="form-actions">
                 <button type="button" className="cancel-btn" onClick={resetForm}>
                   Cancel
                 </button>
-                <button type="submit" className="submit-btn">
-                  {editingActivity ? 'Update Activity' : 'Add Activity'}
+                <button type="submit" className="submit-btn" disabled={loading || uploading}>
+                  {uploading ? 'Uploading...' : loading ? 'Saving...' : editingActivity ? 'Update Activity' : 'Add Activity'}
                 </button>
               </div>
             </form>

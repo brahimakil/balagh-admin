@@ -5,6 +5,7 @@ import {
   deleteDoc, 
   doc, 
   getDocs, 
+  getDoc,
   query,
   orderBy,
   where,
@@ -12,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
+import { fileUploadService, type UploadedFile } from './fileUploadService';
 
 export interface Activity {
   id?: string;
@@ -28,6 +30,8 @@ export interface Activity {
   time: string; // Format: "HH:MM"
   durationHours: number; // NEW FIELD - How long the activity stays active (default 24)
   mainImage: string; // base64 image
+  photos: UploadedFile[]; // Array of photo URLs from Firebase Storage
+  videos: UploadedFile[]; // Array of video URLs from Firebase Storage
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,9 +51,36 @@ export const activitiesService = {
         date: doc.data().date?.toDate(),
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
+        photos: doc.data().photos || [],
+        videos: doc.data().videos || [],
       } as Activity));
     } catch (error) {
       console.error('Error fetching activities:', error);
+      throw error;
+    }
+  },
+
+  // Get single activity
+  async getActivity(id: string): Promise<Activity | null> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          date: data.date?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+          photos: data.photos || [],
+          videos: data.videos || [],
+        } as Activity;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching activity:', error);
       throw error;
     }
   },
@@ -79,6 +110,8 @@ export const activitiesService = {
         date: doc.data().date?.toDate(),
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
+        photos: doc.data().photos || [],
+        videos: doc.data().videos || [],
       } as Activity));
     } catch (error) {
       console.error('Error fetching activities by date:', error);
@@ -87,15 +120,48 @@ export const activitiesService = {
   },
 
   // Add new activity
-  async addActivity(activity: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, currentUserEmail: string, currentUserName?: string): Promise<string> {
+  async addActivity(
+    activity: Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, 
+    currentUserEmail: string, 
+    currentUserName?: string,
+    photoFiles?: File[],
+    videoFiles?: File[]
+  ): Promise<string> {
     try {
       const now = new Date();
+      
+      // First create the activity document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...activity,
         date: Timestamp.fromDate(activity.date),
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
+        photos: [],
+        videos: [],
       });
+
+      // Upload files if provided
+      let photos: UploadedFile[] = [];
+      let videos: UploadedFile[] = [];
+
+      if (photoFiles && photoFiles.length > 0) {
+        const photoFolderPath = fileUploadService.generateFolderPath('activities', docRef.id, 'photos');
+        photos = await fileUploadService.uploadMultipleFiles(photoFiles, photoFolderPath);
+      }
+
+      if (videoFiles && videoFiles.length > 0) {
+        const videoFolderPath = fileUploadService.generateFolderPath('activities', docRef.id, 'videos');
+        videos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
+      }
+
+      // Update the document with file URLs
+      if (photos.length > 0 || videos.length > 0) {
+        await updateDoc(docRef, {
+          photos,
+          videos,
+          updatedAt: Timestamp.fromDate(new Date()),
+        });
+      }
       
       // Add notification
       await notificationsService.createCRUDNotification(
@@ -115,7 +181,14 @@ export const activitiesService = {
   },
 
   // Update activity
-  async updateActivity(id: string, updates: Partial<Activity>, currentUserEmail?: string, currentUserName?: string): Promise<void> {
+  async updateActivity(
+    id: string, 
+    updates: Partial<Activity>, 
+    currentUserEmail?: string, 
+    currentUserName?: string,
+    newPhotoFiles?: File[],
+    newVideoFiles?: File[]
+  ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       const updateData = {
@@ -125,6 +198,33 @@ export const activitiesService = {
       
       if (updates.date) {
         updateData.date = Timestamp.fromDate(updates.date);
+      }
+
+      // Handle file uploads ONLY if there are actually new files
+      let newPhotos: UploadedFile[] = [];
+      let newVideos: UploadedFile[] = [];
+
+      if (newPhotoFiles && newPhotoFiles.length > 0) {
+        const photoFolderPath = fileUploadService.generateFolderPath('activities', id, 'photos');
+        newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
+      }
+
+      if (newVideoFiles && newVideoFiles.length > 0) {
+        const videoFolderPath = fileUploadService.generateFolderPath('activities', id, 'videos');
+        newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
+      }
+
+      // Only update arrays if there are actually new files to add
+      if (newPhotos.length > 0 || newVideos.length > 0) {
+        const existingActivity = await this.getActivity(id);
+        if (existingActivity) {
+          if (newPhotos.length > 0) {
+            updateData.photos = [...(existingActivity.photos || []), ...newPhotos];
+          }
+          if (newVideos.length > 0) {
+            updateData.videos = [...(existingActivity.videos || []), ...newVideos];
+          }
+        }
       }
       
       await updateDoc(docRef, updateData);
@@ -146,9 +246,28 @@ export const activitiesService = {
     }
   },
 
-  // Delete activity
+  // Delete activity and associated files
   async deleteActivity(id: string, activityName: string, currentUserEmail: string, currentUserName?: string): Promise<void> {
     try {
+      // Get activity data to delete associated files
+      const activity = await this.getActivity(id);
+      
+      if (activity) {
+        // Delete associated photos and videos
+        const allFileUrls = [
+          ...(activity.photos?.map(p => p.url) || []),
+          ...(activity.videos?.map(v => v.url) || [])
+        ];
+        
+        if (allFileUrls.length > 0) {
+          try {
+            await fileUploadService.deleteMultipleFiles(allFileUrls);
+          } catch (fileError) {
+            console.warn('Some files could not be deleted:', fileError);
+          }
+        }
+      }
+
       await deleteDoc(doc(db, COLLECTION_NAME, id));
       
       // Add notification
@@ -162,6 +281,38 @@ export const activitiesService = {
       );
     } catch (error) {
       console.error('Error deleting activity:', error);
+      throw error;
+    }
+  },
+
+  // Remove specific photos or videos
+  async removeFiles(
+    activityId: string, 
+    filesToRemove: UploadedFile[], 
+    fileType: 'photos' | 'videos'
+  ): Promise<void> {
+    try {
+      // Delete files from storage
+      const fileUrls = filesToRemove.map(f => f.url);
+      await fileUploadService.deleteMultipleFiles(fileUrls);
+
+      // Update document
+      const activity = await this.getActivity(activityId);
+      if (activity) {
+        const currentFiles = activity[fileType] || [];
+        const updatedFiles = currentFiles.filter(
+          file => !filesToRemove.some(removeFile => removeFile.url === file.url)
+        );
+
+        const updateData = {
+          [fileType]: updatedFiles,
+          updatedAt: Timestamp.fromDate(new Date()),
+        };
+
+        await updateDoc(doc(db, COLLECTION_NAME, activityId), updateData);
+      }
+    } catch (error) {
+      console.error(`Error removing ${fileType}:`, error);
       throw error;
     }
   },

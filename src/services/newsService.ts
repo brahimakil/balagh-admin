@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
+import { fileUploadService, type UploadedFile } from './fileUploadService';
 
 export interface News {
   id?: string;
@@ -22,6 +23,8 @@ export interface News {
   descriptionAr: string;
   type: 'regular' | 'live';
   mainImage: string; // base64 image
+  photos: UploadedFile[]; // Array of photo URLs from Firebase Storage
+  videos: UploadedFile[]; // Array of video URLs from Firebase Storage
   liveDurationHours?: number; // Only for live news
   liveStartTime?: Date; // When live news was activated
   publishDate?: Date; // OPTIONAL for backward compatibility
@@ -45,6 +48,8 @@ export const newsService = {
         liveStartTime: doc.data().liveStartTime?.toDate(),
         createdAt: doc.data().createdAt?.toDate(),
         updatedAt: doc.data().updatedAt?.toDate(),
+        photos: doc.data().photos || [],
+        videos: doc.data().videos || [],
       } as News));
     } catch (error) {
       console.error('Error fetching news:', error);
@@ -52,44 +57,75 @@ export const newsService = {
     }
   },
 
-  // Get only live news
-  async getLiveNews(): Promise<News[]> {
+  // Get single news - ADD THIS NEW METHOD
+  async getNews(id: string): Promise<News | null> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('type', '==', 'live'),
-        orderBy('liveStartTime', 'desc')
-      );
-      const querySnapshot = await getDocs(q);
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const docSnap = await getDoc(docRef);
       
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        liveStartTime: doc.data().liveStartTime?.toDate(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      } as News));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          liveStartTime: data.liveStartTime?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+          photos: data.photos || [],
+          videos: data.videos || [],
+        } as News;
+      }
+      return null;
     } catch (error) {
-      console.error('Error fetching live news:', error);
+      console.error('Error fetching news:', error);
       throw error;
     }
   },
 
-  // Add new news
-  async addNews(news: Omit<News, 'id' | 'createdAt' | 'updatedAt'>, currentUserEmail: string, currentUserName?: string): Promise<string> {
+  // Add new news - UPDATE THIS METHOD
+  async addNews(
+    news: Omit<News, 'id' | 'createdAt' | 'updatedAt'>, 
+    currentUserEmail: string, 
+    currentUserName?: string,
+    photoFiles?: File[],
+    videoFiles?: File[]
+  ): Promise<string> {
     try {
       const now = new Date();
+      
+      // First create the news document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...news,
-        // Remove undefined liveDurationHours if not live news
-        liveDurationHours: news.type === 'live' ? news.liveDurationHours : undefined,
-        liveStartTime: news.type === 'live' && news.liveStartTime 
-          ? Timestamp.fromDate(news.liveStartTime) 
-          : undefined,
-        publishDate: news.publishDate ? Timestamp.fromDate(news.publishDate) : Timestamp.fromDate(new Date()),
+        publishDate: news.publishDate ? Timestamp.fromDate(news.publishDate) : null,
+        liveStartTime: news.liveStartTime ? Timestamp.fromDate(news.liveStartTime) : null,
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
+        photos: [],
+        videos: [],
       });
+
+      // Upload files if provided
+      let photos: UploadedFile[] = [];
+      let videos: UploadedFile[] = [];
+
+      if (photoFiles && photoFiles.length > 0) {
+        const photoFolderPath = fileUploadService.generateFolderPath('news', docRef.id, 'photos');
+        photos = await fileUploadService.uploadMultipleFiles(photoFiles, photoFolderPath);
+      }
+
+      if (videoFiles && videoFiles.length > 0) {
+        const videoFolderPath = fileUploadService.generateFolderPath('news', docRef.id, 'videos');
+        videos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
+      }
+
+      // Update the document with file URLs
+      if (photos.length > 0 || videos.length > 0) {
+        await updateDoc(docRef, {
+          photos,
+          videos,
+          updatedAt: Timestamp.fromDate(new Date()),
+        });
+      }
       
       // Add notification
       await notificationsService.createCRUDNotification(
@@ -108,35 +144,57 @@ export const newsService = {
     }
   },
 
-  // Update news
-  async updateNews(id: string, updates: Partial<News>, currentUserEmail?: string, currentUserName?: string): Promise<void> {
+  // Update news - UPDATE THIS METHOD
+  async updateNews(
+    id: string, 
+    updates: Partial<News>, 
+    currentUserEmail?: string, 
+    currentUserName?: string,
+    newPhotoFiles?: File[],
+    newVideoFiles?: File[]
+  ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      
-      // Create clean update data without undefined values
-      const updateData: any = {
+      const updateData = {
+        ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
-      
-      // Only add fields that are not undefined
-      if (updates.titleEn !== undefined) updateData.titleEn = updates.titleEn;
-      if (updates.titleAr !== undefined) updateData.titleAr = updates.titleAr;
-      if (updates.descriptionEn !== undefined) updateData.descriptionEn = updates.descriptionEn;
-      if (updates.descriptionAr !== undefined) updateData.descriptionAr = updates.descriptionAr;
-      if (updates.type !== undefined) updateData.type = updates.type;
-      if (updates.mainImage !== undefined) updateData.mainImage = updates.mainImage;
-      if (updates.publishDate !== undefined) updateData.publishDate = Timestamp.fromDate(updates.publishDate);
-      if (updates.publishTime !== undefined) updateData.publishTime = updates.publishTime;
-      
-      // Only add liveDurationHours if it's not undefined and the type is live
-      if (updates.liveDurationHours !== undefined && updates.type === 'live') {
-        updateData.liveDurationHours = updates.liveDurationHours;
+
+      // Handle date conversions
+      if (updates.publishDate) {
+        updateData.publishDate = Timestamp.fromDate(updates.publishDate);
       }
-      
       if (updates.liveStartTime) {
         updateData.liveStartTime = Timestamp.fromDate(updates.liveStartTime);
       }
-      
+
+      // Handle file uploads ONLY if there are actually new files
+      let newPhotos: UploadedFile[] = [];
+      let newVideos: UploadedFile[] = [];
+
+      if (newPhotoFiles && newPhotoFiles.length > 0) {
+        const photoFolderPath = fileUploadService.generateFolderPath('news', id, 'photos');
+        newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
+      }
+
+      if (newVideoFiles && newVideoFiles.length > 0) {
+        const videoFolderPath = fileUploadService.generateFolderPath('news', id, 'videos');
+        newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
+      }
+
+      // Only update arrays if there are actually new files to add
+      if (newPhotos.length > 0 || newVideos.length > 0) {
+        const existingNews = await this.getNews(id);
+        if (existingNews) {
+          if (newPhotos.length > 0) {
+            updateData.photos = [...(existingNews.photos || []), ...newPhotos];
+          }
+          if (newVideos.length > 0) {
+            updateData.videos = [...(existingNews.videos || []), ...newVideos];
+          }
+        }
+      }
+
       await updateDoc(docRef, updateData);
       
       // Add notification if user info provided
@@ -157,26 +215,115 @@ export const newsService = {
   },
 
   // Delete news
-  async deleteNews(id: string, newsTitle: string, newsType: string, currentUserEmail: string, currentUserName?: string): Promise<void> {
+  async deleteNews(id: string, newsTitle: string, currentUserEmail: string, currentUserName?: string): Promise<void> {
     try {
+      // Try to get news data and delete files, but don't let it block deletion
+      try {
+        const news = await this.getNews(id);
+        
+        if (news) {
+          const allFileUrls = [
+            ...(news.photos?.map(p => p.url) || []),
+            ...(news.videos?.map(v => v.url) || [])
+          ];
+          
+          if (allFileUrls.length > 0) {
+            await fileUploadService.deleteMultipleFiles(allFileUrls);
+          }
+        }
+      } catch (fileError) {
+        console.warn('File deletion failed, but continuing with news deletion:', fileError);
+      }
+
+      // Delete the news document
       await deleteDoc(doc(db, COLLECTION_NAME, id));
       
-      // Add notification
-      await notificationsService.createCRUDNotification(
-        'deleted',
-        newsType === 'live' ? 'liveNews' : 'news',
-        id,
-        newsTitle,
-        currentUserEmail,
-        currentUserName
-      );
+      // Try to add notification, but don't let it block deletion
+      try {
+        await notificationsService.createCRUDNotification(
+          'deleted',
+          'news',
+          id,
+          newsTitle,
+          currentUserEmail,
+          currentUserName
+        );
+      } catch (notificationError) {
+        console.warn('Notification creation failed:', notificationError);
+      }
     } catch (error) {
       console.error('Error deleting news:', error);
       throw error;
     }
   },
 
-  // Update expired live news to regular
+  // ADD THIS NEW METHOD - Remove specific photos or videos
+  async removeFiles(
+    newsId: string, 
+    filesToRemove: UploadedFile[], 
+    fileType: 'photos' | 'videos'
+  ): Promise<void> {
+    try {
+      // Delete files from storage
+      const fileUrls = filesToRemove.map(f => f.url);
+      await fileUploadService.deleteMultipleFiles(fileUrls);
+
+      // Update document
+      const news = await this.getNews(newsId);
+      if (news) {
+        const currentFiles = news[fileType] || [];
+        const updatedFiles = currentFiles.filter(
+          file => !filesToRemove.some(removeFile => removeFile.url === file.url)
+        );
+
+        const updateData = {
+          [fileType]: updatedFiles,
+          updatedAt: Timestamp.fromDate(new Date()),
+        };
+
+        await updateDoc(doc(db, COLLECTION_NAME, newsId), updateData);
+      }
+    } catch (error) {
+      console.error(`Error removing ${fileType}:`, error);
+      throw error;
+    }
+  },
+
+  // Get live news
+  async getLiveNews(): Promise<News[]> {
+    try {
+      const now = new Date();
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('type', '==', 'live'),
+        orderBy('liveStartTime', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          liveStartTime: doc.data().liveStartTime?.toDate(),
+          createdAt: doc.data().createdAt?.toDate(),
+          updatedAt: doc.data().updatedAt?.toDate(),
+          photos: doc.data().photos || [],
+          videos: doc.data().videos || [],
+        } as News))
+        .filter(news => {
+          if (!news.liveStartTime || !news.liveDurationHours) return false;
+          const endTime = new Date(news.liveStartTime);
+          endTime.setHours(endTime.getHours() + news.liveDurationHours);
+          return now <= endTime;
+        });
+    } catch (error) {
+      console.error('Error fetching live news:', error);
+      throw error;
+    }
+  },
+
+  // ADD THIS MISSING METHOD
   async updateExpiredLiveNews(): Promise<void> {
     try {
       const now = new Date();
@@ -188,25 +335,24 @@ export const newsService = {
       const querySnapshot = await getDocs(q);
       
       const updatePromises = querySnapshot.docs.map(doc => {
-        const newsItem = {
+        const news = {
           id: doc.id,
           ...doc.data(),
           liveStartTime: doc.data().liveStartTime?.toDate(),
+          liveDurationHours: doc.data().liveDurationHours || 2,
         } as News;
         
-        if (newsItem.liveStartTime && newsItem.liveDurationHours) {
-          const liveEndTime = new Date(newsItem.liveStartTime);
-          liveEndTime.setHours(liveEndTime.getHours() + newsItem.liveDurationHours);
-          
-          if (now >= liveEndTime) {
-            // Change TYPE from 'live' to 'regular' and remove live-specific fields
-            return updateDoc(doc.ref, {
-              type: 'regular',
-              liveDurationHours: null, // Remove live duration
-              liveStartTime: null,     // Remove live start time
-              updatedAt: Timestamp.fromDate(now)
-            });
-          }
+        if (!news.liveStartTime || !news.liveDurationHours) return Promise.resolve();
+        
+        const endTime = new Date(news.liveStartTime);
+        endTime.setHours(endTime.getHours() + news.liveDurationHours);
+        
+        // If live news has expired, convert it to regular news
+        if (now >= endTime) {
+          return updateDoc(doc.ref, {
+            type: 'regular',
+            updatedAt: Timestamp.fromDate(now)
+          });
         }
         
         return Promise.resolve();

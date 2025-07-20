@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { newsService, type News } from '../services/newsService';
 import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
+import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
 
 interface NewsProps {
   defaultType?: 'regular' | 'live';
@@ -15,6 +16,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [translating, setTranslating] = useState<string>('');
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -107,6 +111,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
 
     try {
       setLoading(true);
+      setUploading(true);
       
       // Combine publish date and time to create full datetime
       const publishDateTime = new Date(`${formData.publishDate}T${formData.publishTime}`);
@@ -124,14 +129,18 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
           editingNews.id!, 
           newsData as News, 
           currentUser?.email, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined
         );
         setSuccess('News updated successfully');
       } else {
         await newsService.addNews(
-          newsData as Omit<News, 'id' | 'createdAt' | 'updatedAt'>, 
+          { ...newsData, photos: [], videos: [] } as Omit<News, 'id' | 'createdAt' | 'updatedAt'>, 
           currentUser?.email!, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined
         );
         setSuccess('News added successfully');
       }
@@ -143,6 +152,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       setError('Failed to save news. Please try again.');
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -157,6 +167,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       mainImage: '',
     });
     setImagePreview('');
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
     setEditingNews(null);
     setShowForm(false);
     setError('');
@@ -182,26 +194,26 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       publishTime  // Always current time
     });
     setImagePreview(newsItem.mainImage);
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
     setEditingNews(newsItem);
     setShowForm(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this news?')) return;
-
+    if (!window.confirm('Are you sure you want to delete this news?')) return;
+    
     try {
-      const { currentUser, currentUserData } = useAuth();
+      // DON'T call useAuth() here - use the existing currentUser from component scope
       await newsService.deleteNews(
         id, 
         news.find(n => n.id === id)?.titleEn || 'News', 
-        news.find(n => n.id === id)?.type || 'regular',
         currentUser?.email!, 
         currentUserData?.fullName
       );
       setSuccess('News deleted successfully');
       loadNews();
     } catch (error) {
-      console.error('Error deleting news:', error);
       setError('Failed to delete news');
     }
   };
@@ -216,6 +228,84 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
         setImagePreview(base64String);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only image files for photos');
+      e.target.value = '';
+      return;
+    }
+    
+    setSelectedPhotos(prev => [...prev, ...validFiles]);
+    e.target.value = '';
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('video/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only video files');
+      e.target.value = '';
+      return;
+    }
+    
+    setSelectedVideos(prev => [...prev, ...validFiles]);
+    e.target.value = '';
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeSelectedVideo = (index: number) => {
+    setSelectedVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingFile = async (newsId: string, file: UploadedFile, fileType: 'photos' | 'videos') => {
+    if (!window.confirm(`Are you sure you want to delete this ${fileType.slice(0, -1)}?`)) return;
+    
+    try {
+      setLoading(true);
+      await newsService.removeFiles(newsId, [file], fileType);
+      
+      if (editingNews && editingNews.id === newsId) {
+        const updatedFiles = editingNews[fileType]?.filter(
+          existingFile => existingFile.url !== file.url
+        ) || [];
+        
+        setEditingNews({
+          ...editingNews,
+          [fileType]: updatedFiles
+        });
+      }
+      
+      setNews(prevNews => 
+        prevNews.map(newsItem => {
+          if (newsItem.id === newsId) {
+            const updatedFiles = newsItem[fileType]?.filter(
+              existingFile => existingFile.url !== file.url
+            ) || [];
+            
+            return {
+              ...newsItem,
+              [fileType]: updatedFiles
+            };
+          }
+          return newsItem;
+        })
+      );
+      
+      setSuccess(`${fileType.slice(0, -1)} deleted successfully`);
+    } catch (error) {
+      setError(`Failed to delete ${fileType.slice(0, -1)}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -346,6 +436,15 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
               </p>
               <div className="story-preview">
                 <p>{newsItem.descriptionEn.substring(0, 100)}{newsItem.descriptionEn.length > 100 ? '...' : ''}</p>
+              </div>
+              {/* Display media counts */}
+              <div className="media-counts">
+                {newsItem.photos && newsItem.photos.length > 0 && (
+                  <span className="media-count">📷 {newsItem.photos.length}</span>
+                )}
+                {newsItem.videos && newsItem.videos.length > 0 && (
+                  <span className="media-count">🎥 {newsItem.videos.length}</span>
+                )}
               </div>
               <div className="card-actions">
                 <button 
@@ -501,6 +600,134 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                   </div>
                 </div>
 
+                {/* Photos Upload */}
+                <div className="form-row">
+                  <div className="form-group full-width">
+                    <label>Additional Photos</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoUpload}
+                      className="file-input"
+                    />
+                    
+                    {selectedPhotos.length > 0 && (
+                      <div className="file-preview-grid">
+                        <h4>Selected Photos ({selectedPhotos.length})</h4>
+                        <div className="preview-grid">
+                          {selectedPhotos.map((file, index) => (
+                            <div key={index} className="preview-item">
+                              <img 
+                                src={URL.createObjectURL(file)} 
+                                alt={`Preview ${index + 1}`} 
+                                className="preview-image"
+                              />
+                              <button
+                                type="button"
+                                className="remove-file-btn"
+                                onClick={() => removeSelectedPhoto(index)}
+                              >
+                                ×
+                              </button>
+                              <span className="file-name">{file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {editingNews && editingNews.photos && editingNews.photos.length > 0 && (
+                      <div className="file-preview-grid">
+                        <h4>Existing Photos ({editingNews.photos.length})</h4>
+                        <div className="preview-grid">
+                          {editingNews.photos.map((photo, index) => (
+                            <div key={index} className="preview-item">
+                              <img 
+                                src={photo.url} 
+                                alt={`Photo ${index + 1}`} 
+                                className="preview-image"
+                              />
+                              <button
+                                type="button"
+                                className="remove-file-btn"
+                                onClick={() => removeExistingFile(editingNews.id!, photo, 'photos')}
+                              >
+                                ×
+                              </button>
+                              <span className="file-name">{photo.fileName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Videos Upload */}
+                <div className="form-row">
+                  <div className="form-group full-width">
+                    <label>Additional Videos</label>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      multiple
+                      onChange={handleVideoUpload}
+                      className="file-input"
+                    />
+                    
+                    {selectedVideos.length > 0 && (
+                      <div className="file-preview-grid">
+                        <h4>Selected Videos ({selectedVideos.length})</h4>
+                        <div className="preview-grid">
+                          {selectedVideos.map((file, index) => (
+                            <div key={index} className="preview-item">
+                              <video 
+                                src={URL.createObjectURL(file)} 
+                                controls
+                                className="preview-video"
+                              />
+                              <button
+                                type="button"
+                                className="remove-file-btn"
+                                onClick={() => removeSelectedVideo(index)}
+                              >
+                                ×
+                              </button>
+                              <span className="file-name">{file.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {editingNews && editingNews.videos && editingNews.videos.length > 0 && (
+                      <div className="file-preview-grid">
+                        <h4>Existing Videos ({editingNews.videos.length})</h4>
+                        <div className="preview-grid">
+                          {editingNews.videos.map((video, index) => (
+                            <div key={index} className="preview-item">
+                              <video 
+                                src={video.url} 
+                                controls
+                                className="preview-video"
+                              />
+                              <button
+                                type="button"
+                                className="remove-file-btn"
+                                onClick={() => removeExistingFile(editingNews.id!, video, 'videos')}
+                              >
+                                ×
+                              </button>
+                              <span className="file-name">{video.fileName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Publish Date and Time */}
                 <div className="form-row">
                   <div className="form-group">
@@ -527,8 +754,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                   <button type="button" className="cancel-btn" onClick={closeForm}>
                     Cancel
                   </button>
-                  <button type="submit" className="submit-btn" disabled={loading}>
-                    {loading ? 'Saving...' : editingNews ? 'Update News' : 'Add News'}
+                  <button type="submit" className="submit-btn" disabled={loading || uploading}>
+                    {uploading ? 'Uploading...' : loading ? 'Saving...' : editingNews ? 'Update News' : 'Add News'}
                   </button>
                 </div>
               </form>

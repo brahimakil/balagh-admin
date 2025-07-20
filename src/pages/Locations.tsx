@@ -6,6 +6,8 @@ import { legendsService, type Legend } from '../services/legendsService';
 import { translationService } from '../services/translationService';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
+import Photo360ViewerSimple from '../components/Photo360ViewerSimple';
+import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
 
 // Fix for default markers in react-leaflet
 delete (Icon.Default.prototype as any)._getIconUrl;
@@ -23,24 +25,28 @@ const Locations: React.FC = () => {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([31.9554, 35.9384]); // Default to Palestine
+  const { currentUser, currentUserData } = useAuth();
 
-  // Form data - Default to South Lebanon coordinates
+  // File upload states
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
+  const [selectedPhotos360, setSelectedPhotos360] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  // Form data
   const [formData, setFormData] = useState({
     nameEn: '',
     nameAr: '',
     legendId: '',
-    latitude: 33.2734, // South Lebanon latitude
-    longitude: 35.2044, // South Lebanon longitude
+    latitude: 31.9554,
+    longitude: 35.9384,
     descriptionEn: '',
     descriptionAr: '',
     mainImage: ''
   });
 
   const [translating, setTranslating] = useState<string>('');
-  // Default map center to South Lebanon
-  const [mapCenter, setMapCenter] = useState<[number, number]>([33.2734, 35.2044]);
-
-  const { currentUser, currentUserData } = useAuth();
 
   useEffect(() => {
     loadData();
@@ -138,24 +144,124 @@ const Locations: React.FC = () => {
     }
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only image files for photos');
+      return;
+    }
+    
+    setSelectedPhotos(prev => [...prev, ...validFiles]);
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('video/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only video files');
+      return;
+    }
+    
+    setSelectedVideos(prev => [...prev, ...validFiles]);
+  };
+
+  const handlePhotos360Upload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only image files for 360 photos');
+      return;
+    }
+    
+    setSelectedPhotos360(prev => [...prev, ...validFiles]);
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeSelectedVideo = (index: number) => {
+    setSelectedVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeSelectedPhoto360 = (index: number) => {
+    setSelectedPhotos360(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingFile = async (locationId: string, file: UploadedFile, fileType: 'photos' | 'videos' | 'photos360') => {
+    if (!window.confirm(`Are you sure you want to delete this ${fileType === 'photos360' ? '360 photo' : fileType.slice(0, -1)}?`)) return;
+    
+    try {
+      setLoading(true);
+      await locationsService.removeFiles(locationId, [file], fileType);
+      
+      // Update the editingLocation state immediately to reflect the change in UI
+      if (editingLocation && editingLocation.id === locationId) {
+        const updatedFiles = editingLocation[fileType]?.filter(
+          existingFile => existingFile.url !== file.url
+        ) || [];
+        
+        setEditingLocation({
+          ...editingLocation,
+          [fileType]: updatedFiles
+        });
+      }
+      
+      // Also update the locations list to reflect the change
+      setLocations(prevLocations => 
+        prevLocations.map(location => {
+          if (location.id === locationId) {
+            const updatedFiles = location[fileType]?.filter(
+              existingFile => existingFile.url !== file.url
+            ) || [];
+            
+            return {
+              ...location,
+              [fileType]: updatedFiles
+            };
+          }
+          return location;
+        })
+      );
+      
+      setSuccess(`${fileType === 'photos360' ? '360 photo' : fileType.slice(0, -1)} deleted successfully`);
+    } catch (error) {
+      setError(`Failed to delete ${fileType === 'photos360' ? '360 photo' : fileType.slice(0, -1)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       nameEn: '',
       nameAr: '',
       legendId: '',
-      latitude: 33.2734, // Reset to South Lebanon
-      longitude: 35.2044,
+      latitude: 31.9554,
+      longitude: 35.9384,
       descriptionEn: '',
       descriptionAr: '',
       mainImage: ''
     });
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
+    setSelectedPhotos360([]);
     setEditingLocation(null);
     setShowForm(false);
+    setError('');
+    setSuccess('');
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingLocation(null);
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
+    setSelectedPhotos360([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,21 +279,28 @@ const Locations: React.FC = () => {
 
     try {
       setLoading(true);
+      setUploading(true);
       setError('');
       
       if (editingLocation) {
         await locationsService.updateLocation(
           editingLocation.id!, 
           formData as Location, 
-          currentUser.email,  // Add user email
-          currentUserData?.fullName  // Add user name
+          currentUser.email,
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined
         );
         setSuccess('Location updated successfully!');
       } else {
         await locationsService.addLocation(
-          formData as Omit<Location, 'id' | 'createdAt' | 'updatedAt'>, 
-          currentUser.email,  // Add user email
-          currentUserData?.fullName  // Add user name
+          { ...formData, photos: [], videos: [], photos360: [] } as Omit<Location, 'id' | 'createdAt' | 'updatedAt'>, 
+          currentUser.email,
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined
         );
         setSuccess('Location added successfully!');
       }
@@ -199,6 +312,7 @@ const Locations: React.FC = () => {
       setError(`Failed to save location: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -213,31 +327,31 @@ const Locations: React.FC = () => {
       descriptionAr: location.descriptionAr,
       mainImage: location.mainImage
     });
+    
+    // Clear any previously selected files
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
+    setSelectedPhotos360([]);
+    
     setEditingLocation(location);
     setMapCenter([location.latitude, location.longitude]);
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string, locationName: string) => {
-    if (!currentUser?.email) {
-      setError('User not authenticated');
-      return;
-    }
-
-    if (window.confirm('Are you sure you want to delete this location?')) {
-      try {
-        await locationsService.deleteLocation(
-          id, 
-          locationName, 
-          currentUser.email,  // Add user email
-          currentUserData?.fullName  // Add user name
-        );
-        setSuccess('Location deleted successfully!');
-        loadData();
-      } catch (error: any) {
-        console.error('Error deleting location:', error);
-        setError('Failed to delete location');
-      }
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this location?')) return;
+    
+    try {
+      await locationsService.deleteLocation(
+        id, 
+        locations.find(l => l.id === id)?.nameEn || 'Location', 
+        currentUser?.email!, 
+        currentUserData?.fullName
+      );
+      setSuccess('Location deleted successfully!');
+      loadData();
+    } catch (error) {
+      setError('Failed to delete location');
     }
   };
 
@@ -444,12 +558,210 @@ const Locations: React.FC = () => {
                 </div>
               </div>
 
+              {/* Photos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Photos</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="file-input"
+                  />
+                  
+                  {/* Display selected photos */}
+                  {selectedPhotos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Photos ({selectedPhotos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedPhotos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={URL.createObjectURL(file)} 
+                              alt={`Preview ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedPhoto(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display existing photos for editing */}
+                  {editingLocation && editingLocation.photos && editingLocation.photos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Photos ({editingLocation.photos.length})</h4>
+                      <div className="preview-grid">
+                        {editingLocation.photos.map((photo, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={photo.url} 
+                              alt={`Photo ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingLocation.id!, photo, 'photos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{photo.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Videos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Videos</label>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={handleVideoUpload}
+                    className="file-input"
+                  />
+                  
+                  {/* Display selected videos */}
+                  {selectedVideos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Videos ({selectedVideos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedVideos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={URL.createObjectURL(file)} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedVideo(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display existing videos for editing */}
+                  {editingLocation && editingLocation.videos && editingLocation.videos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Videos ({editingLocation.videos.length})</h4>
+                      <div className="preview-grid">
+                        {editingLocation.videos.map((video, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={video.url} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingLocation.id!, video, 'videos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{video.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 360 Photos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>360° Photos</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotos360Upload}
+                    className="file-input"
+                  />
+                  
+                  {/* Display selected 360 photos */}
+                  {selectedPhotos360.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected 360° Photos ({selectedPhotos360.length})</h4>
+                      <div className="preview-grid preview-grid-360">
+                        {selectedPhotos360.map((file, index) => (
+                          <div key={index} className="preview-item preview-360">
+                            <Photo360ViewerSimple 
+                              imageUrl={URL.createObjectURL(file)} 
+                              width={220} 
+                              height={160} 
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedPhoto360(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display existing 360 photos for editing */}
+                  {editingLocation && editingLocation.photos360 && editingLocation.photos360.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing 360° Photos ({editingLocation.photos360.length})</h4>
+                      <div className="preview-grid preview-grid-360">
+                        {editingLocation.photos360.map((photo360, index) => (
+                          <div key={index} className="preview-item preview-360">
+                            <Photo360ViewerSimple 
+                              imageUrl={photo360.url} 
+                              width={220} 
+                              height={160} 
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingLocation.id!, photo360, 'photos360')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{photo360.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="form-actions">
                 <button type="button" className="cancel-btn" onClick={closeForm}>
                   Cancel
                 </button>
-                <button type="submit" className="submit-btn" disabled={loading}>
-                  {loading ? 'Saving...' : editingLocation ? 'Update Location' : 'Add Location'}
+                <button type="submit" className="submit-btn" disabled={loading || uploading}>
+                  {uploading ? 'Uploading...' : loading ? 'Saving...' : editingLocation ? 'Update Location' : 'Add Location'}
                 </button>
               </div>
             </form>
@@ -485,7 +797,7 @@ const Locations: React.FC = () => {
                 </button>
                 <button 
                   className="delete-btn"
-                  onClick={() => handleDelete(location.id!, location.nameEn)}
+                  onClick={() => handleDelete(location.id!)}
                 >
                   Delete
                 </button>

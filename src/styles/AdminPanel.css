@@ -5868,3 +5868,196 @@ body {
     order: -1; /* Move language switcher before other buttons on small screens */
   }
 }
+
+/* File Upload Styles */
+.file-preview-grid {
+  margin-top: 1rem;
+}
+
+.file-preview-grid h4 {
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.preview-item {
+  position: relative;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--card-background);
+}
+
+.preview-image,
+.preview-video {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+.preview-video {
+  height: 90px;
+}
+
+.remove-file-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.remove-file-btn:hover {
+  background: rgba(255, 0, 0, 1);
+}
+
+.file-name {
+  display: block;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.media-counts {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.media-count {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+/* Loading states */
+.form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Large modal for file uploads */
+.modal-content {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .preview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
+  }
+  
+  .preview-image,
+  .preview-video {
+    height: 80px;
+  }
+  
+  .preview-video {
+    height: 60px;
+  }
+}
+
+/* 360 Photo Viewer Styles */
+.photo-360-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.photo-360-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 500;
+}
+
+.preview-360 {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.preview-360 .photo-360-viewer canvas {
+  border: 2px solid #9C27B0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.2);
+}
+
+/* Special grid for 360 photos - bigger items */
+.preview-grid-360 {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.preview-grid-360 .preview-item {
+  min-height: 220px;
+  padding: 0.5rem;
+}
+
+.preview-grid-360 .file-name {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* Media count for 360 photos */
+.media-count {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+/* Different colors for different media types */
+.media-count:nth-child(1) { background: #4CAF50; } /* Photos - Green */
+.media-count:nth-child(2) { background: #FF9800; } /* Videos - Orange */
+.media-count:nth-child(3) { background: #9C27B0; } /* 360 Photos - Purple */
+
+/* Responsive adjustments for 360 viewer */
+@media (max-width: 768px) {
+  .preview-grid-360 {
+    grid-template-columns: 1fr;
+  }
+  
+  .preview-360 .photo-360-viewer canvas {
+    width: 180px !important;
+    height: 120px !important;
+  }
+  
+  .preview-grid-360 .preview-item {
+    min-height: 160px;
+  }
+}
+
+@media (max-width: 480px) {
+  .preview-360 .photo-360-viewer canvas {
+    width: 150px !important;
+    height: 100px !important;
+  }
+}

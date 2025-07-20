@@ -16,6 +16,11 @@ const Martyrs: React.FC = () => {
   const [regeneratingQR, setRegeneratingQR] = useState(false);
   const { currentUser, currentUserData } = useAuth();
 
+  // File upload states
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+
   // Form data
   const [formData, setFormData] = useState({
     nameEn: '',
@@ -91,6 +96,82 @@ const Martyrs: React.FC = () => {
     }
   };
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only image files for photos');
+      return;
+    }
+    
+    setSelectedPhotos(prev => [...prev, ...validFiles]);
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => file.type.startsWith('video/'));
+    
+    if (validFiles.length !== files.length) {
+      setError('Please select only video files');
+      return;
+    }
+    
+    setSelectedVideos(prev => [...prev, ...validFiles]);
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeSelectedVideo = (index: number) => {
+    setSelectedVideos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingFile = async (martyrId: string, file: UploadedFile, fileType: 'photos' | 'videos') => {
+    if (!window.confirm(`Are you sure you want to delete this ${fileType.slice(0, -1)}?`)) return;
+    
+    try {
+      setLoading(true);
+      await martyrsService.removeFiles(martyrId, [file], fileType);
+      
+      // Update the editingMartyr state immediately to reflect the change in UI
+      if (editingMartyr && editingMartyr.id === martyrId) {
+        const updatedFiles = editingMartyr[fileType]?.filter(
+          existingFile => existingFile.url !== file.url
+        ) || [];
+        
+        setEditingMartyr({
+          ...editingMartyr,
+          [fileType]: updatedFiles
+        });
+      }
+      
+      // Also update the martyrs list to reflect the change
+      setMartyrs(prevMartyrs => 
+        prevMartyrs.map(martyr => {
+          if (martyr.id === martyrId) {
+            const updatedFiles = martyr[fileType]?.filter(
+              existingFile => existingFile.url !== file.url
+            ) || [];
+            
+            return {
+              ...martyr,
+              [fileType]: updatedFiles
+            };
+          }
+          return martyr;
+        })
+      );
+      
+      setSuccess(`${fileType.slice(0, -1)} deleted successfully`);
+    } catch (error) {
+      setError(`Failed to delete ${fileType.slice(0, -1)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       nameEn: '',
@@ -104,6 +185,8 @@ const Martyrs: React.FC = () => {
       storyAr: '',
       mainIcon: ''
     });
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
     setEditingMartyr(null);
     setShowForm(false);
     // Don't clear error and success here - let them show on the main page
@@ -113,6 +196,8 @@ const Martyrs: React.FC = () => {
     // Only close the form, don't reset error/success
     setShowForm(false);
     setEditingMartyr(null);
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
   };
 
   // Clear messages after some time
@@ -149,6 +234,7 @@ const Martyrs: React.FC = () => {
 
     try {
       setLoading(true);
+      setUploading(true);
       setError('');
       
       const martyrData = {
@@ -156,9 +242,6 @@ const Martyrs: React.FC = () => {
         dob: new Date(formData.dob),
         dateOfShahada: new Date(formData.dateOfShahada)
       };
-
-      // Remove this line: const { currentUser, currentUserData } = useAuth();
-      // The variables are now available from the top level
 
       if (editingMartyr) {
         // Generate high-quality QR code for updated martyr
@@ -178,7 +261,9 @@ const Martyrs: React.FC = () => {
           editingMartyr.id!, 
           martyrData as Martyr, 
           currentUser.email,
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined, // Only pass if there are files
+          selectedVideos.length > 0 ? selectedVideos : undefined  // Only pass if there are files
         );
         setSuccess('Martyr updated successfully!');
       } else {
@@ -195,9 +280,11 @@ const Martyrs: React.FC = () => {
         }
 
         await martyrsService.addMartyr(
-          { ...martyrData, qrCode: qrCodeWithLogo } as Omit<Martyr, 'id' | 'createdAt' | 'updatedAt'>, 
+          { ...martyrData, qrCode: qrCodeWithLogo, photos: [], videos: [] } as Omit<Martyr, 'id' | 'createdAt' | 'updatedAt'>, 
           currentUser.email,
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos.length > 0 ? selectedPhotos : undefined, // Only pass if there are files
+          selectedVideos.length > 0 ? selectedVideos : undefined  // Only pass if there are files
         );
         setSuccess('Martyr added successfully!');
       }
@@ -209,6 +296,7 @@ const Martyrs: React.FC = () => {
       setError(`Failed to save martyr: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -225,6 +313,11 @@ const Martyrs: React.FC = () => {
       storyAr: martyr.storyAr,
       mainIcon: martyr.mainIcon
     });
+    
+    // Clear any previously selected files
+    setSelectedPhotos([]);
+    setSelectedVideos([]);
+    
     setEditingMartyr(martyr);
     setShowForm(true);
   };
@@ -233,7 +326,7 @@ const Martyrs: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this martyr?')) return;
     
     try {
-      const { currentUser, currentUserData } = useAuth();
+      // DON'T call useAuth() here - use the existing currentUser from component scope
       await martyrsService.deleteMartyr(
         id, 
         martyrs.find(m => m.id === id)?.nameEn || 'Martyr', 
@@ -553,7 +646,7 @@ const Martyrs: React.FC = () => {
               <button className="close-btn" onClick={closeForm}>×</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="martyr-form">
+            <form onSubmit={handleSubmit} className="form-container">
               {/* Name Fields */}
               <div className="form-row">
                 <div className="form-group">
@@ -710,12 +803,144 @@ const Martyrs: React.FC = () => {
                 </div>
               </div>
 
+              {/* Photos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Photos</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="file-input"
+                  />
+                  
+                  {/* Display selected photos */}
+                  {selectedPhotos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Photos ({selectedPhotos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedPhotos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={URL.createObjectURL(file)} 
+                              alt={`Preview ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedPhoto(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display existing photos for editing */}
+                  {editingMartyr && editingMartyr.photos && editingMartyr.photos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Photos ({editingMartyr.photos.length})</h4>
+                      <div className="preview-grid">
+                        {editingMartyr.photos.map((photo, index) => (
+                          <div key={index} className="preview-item">
+                            <img 
+                              src={photo.url} 
+                              alt={`Photo ${index + 1}`} 
+                              className="preview-image"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingMartyr.id!, photo, 'photos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{photo.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Videos Upload */}
+              <div className="form-row">
+                <div className="form-group full-width">
+                  <label>Additional Videos</label>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    multiple
+                    onChange={handleVideoUpload}
+                    className="file-input"
+                  />
+                  
+                  {/* Display selected videos */}
+                  {selectedVideos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Selected Videos ({selectedVideos.length})</h4>
+                      <div className="preview-grid">
+                        {selectedVideos.map((file, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={URL.createObjectURL(file)} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeSelectedVideo(index)}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display existing videos for editing */}
+                  {editingMartyr && editingMartyr.videos && editingMartyr.videos.length > 0 && (
+                    <div className="file-preview-grid">
+                      <h4>Existing Videos ({editingMartyr.videos.length})</h4>
+                      <div className="preview-grid">
+                        {editingMartyr.videos.map((video, index) => (
+                          <div key={index} className="preview-item">
+                            <video 
+                              src={video.url} 
+                              controls
+                              className="preview-video"
+                            />
+                            <button
+                              type="button"
+                              className="remove-file-btn"
+                              onClick={() => removeExistingFile(editingMartyr.id!, video, 'videos')}
+                            >
+                              ×
+                            </button>
+                            <span className="file-name">{video.fileName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="form-actions">
                 <button type="button" className="cancel-btn" onClick={closeForm}>
                   Cancel
                 </button>
-                <button type="submit" className="submit-btn" disabled={loading}>
-                  {loading ? 'Saving...' : editingMartyr ? 'Update Martyr' : 'Add Martyr'}
+                <button type="submit" className="submit-btn" disabled={loading || uploading}>
+                  {uploading ? 'Uploading...' : loading ? 'Saving...' : editingMartyr ? 'Update Martyr' : 'Add Martyr'}
                 </button>
               </div>
             </form>
@@ -741,6 +966,17 @@ const Martyrs: React.FC = () => {
                 Born: {martyr.dob.toLocaleDateString()} | 
                 Shahada: {martyr.dateOfShahada.toLocaleDateString()}
               </p>
+              
+              {/* Display media counts */}
+              <div className="media-counts">
+                {martyr.photos && martyr.photos.length > 0 && (
+                  <span className="media-count">📷 {martyr.photos.length}</span>
+                )}
+                {martyr.videos && martyr.videos.length > 0 && (
+                  <span className="media-count">🎥 {martyr.videos.length}</span>
+                )}
+              </div>
+
               <div className="card-actions">
                 <button 
                   className="edit-btn"
