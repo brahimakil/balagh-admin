@@ -50,13 +50,13 @@ const COLLECTION_NAME = 'users';
 
 // Create a secondary app for admin creation
 const secondaryAppConfig = {
-  apiKey: "AIzaSyCG2ZKCJDHCyXehaqOL66S7gb44o6wu7ow",
-  authDomain: "balagh-adbc4.firebaseapp.com",
-  projectId: "balagh-adbc4",
-  storageBucket: "balagh-adbc4.firebasestorage.app",
-  messagingSenderId: "849348028193",
-  appId: "1:849348028193:web:66c65700b9454efe22c060",
-  measurementId: "G-FG3Q3B40C8"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const secondaryApp = initializeApp(secondaryAppConfig, 'secondary');
