@@ -6162,3 +6162,32 @@ body {
   font-style: italic;
   margin-bottom: 0.5rem;
 }
+
+.view-home-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.view-home-btn:hover {
+  background: #218838;
+  text-decoration: none;
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .view-home-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+}
