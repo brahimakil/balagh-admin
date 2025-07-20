@@ -86,14 +86,24 @@ export const locationsService = {
     currentUserName?: string,
     photoFiles?: File[],
     videoFiles?: File[],
-    photos360Files?: File[]
+    photos360Files?: File[],
+    mainImageFile?: File
   ): Promise<string> {
     try {
       const now = new Date();
       
+      // Upload main image if provided
+      let mainImageUrl = location.mainImage; // Keep existing if no new file
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('locations', 'temp', 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, `main-image-${Date.now()}`);
+        mainImageUrl = mainImageResult.url;
+      }
+      
       // First create the location document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...location,
+        mainImage: mainImageUrl,
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
         photos: [],
@@ -156,7 +166,8 @@ export const locationsService = {
     currentUserName?: string,
     newPhotoFiles?: File[],
     newVideoFiles?: File[],
-    newPhotos360Files?: File[]
+    newPhotos360Files?: File[],
+    mainImageFile?: File
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
@@ -164,6 +175,13 @@ export const locationsService = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
+
+      // Upload main image if provided
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('locations', id, 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, 'main-image');
+        updateData.mainImage = mainImageResult.url;
+      }
 
       // Handle file uploads ONLY if there are actually new files
       let newPhotos: UploadedFile[] = [];

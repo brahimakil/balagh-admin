@@ -33,6 +33,7 @@ const Locations: React.FC = () => {
   const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
   const [selectedPhotos360, setSelectedPhotos360] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -135,6 +136,7 @@ const Locations: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedMainImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
@@ -250,6 +252,7 @@ const Locations: React.FC = () => {
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setSelectedPhotos360([]);
+    setSelectedMainImageFile(null);
     setEditingLocation(null);
     setShowForm(false);
     setError('');
@@ -290,7 +293,8 @@ const Locations: React.FC = () => {
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
           selectedVideos.length > 0 ? selectedVideos : undefined,
-          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined
+          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Location updated successfully!');
       } else {
@@ -300,7 +304,8 @@ const Locations: React.FC = () => {
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
           selectedVideos.length > 0 ? selectedVideos : undefined,
-          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined
+          selectedPhotos360.length > 0 ? selectedPhotos360 : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Location added successfully!');
       }
@@ -332,6 +337,7 @@ const Locations: React.FC = () => {
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setSelectedPhotos360([]);
+    setSelectedMainImageFile(null);
     
     setEditingLocation(location);
     setMapCenter([location.latitude, location.longitude]);

@@ -125,14 +125,24 @@ export const activitiesService = {
     currentUserEmail: string, 
     currentUserName?: string,
     photoFiles?: File[],
-    videoFiles?: File[]
+    videoFiles?: File[],
+    mainImageFile?: File
   ): Promise<string> {
     try {
       const now = new Date();
       
+      // Upload main image if provided
+      let mainImageUrl = activity.mainImage; // Keep existing if no new file
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('activities', 'temp', 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, `main-image-${Date.now()}`);
+        mainImageUrl = mainImageResult.url;
+      }
+      
       // First create the activity document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...activity,
+        mainImage: mainImageUrl,
         date: Timestamp.fromDate(activity.date),
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
@@ -187,7 +197,8 @@ export const activitiesService = {
     currentUserEmail?: string, 
     currentUserName?: string,
     newPhotoFiles?: File[],
-    newVideoFiles?: File[]
+    newVideoFiles?: File[],
+    mainImageFile?: File
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
@@ -195,6 +206,13 @@ export const activitiesService = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
+
+      // Upload main image if provided
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('activities', id, 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, 'main-image');
+        updateData.mainImage = mainImageResult.url;
+      }
       
       if (updates.date) {
         updateData.date = Timestamp.fromDate(updates.date);

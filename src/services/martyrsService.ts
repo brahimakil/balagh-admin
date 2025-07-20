@@ -89,14 +89,24 @@ export const martyrsService = {
     currentUserEmail: string, 
     currentUserName?: string,
     photoFiles?: File[],
-    videoFiles?: File[]
+    videoFiles?: File[],
+    mainIconFile?: File
   ): Promise<string> {
     try {
       const now = new Date();
       
+      // Upload main icon if provided
+      let mainIconUrl = martyr.mainIcon; // Keep existing if no new file
+      if (mainIconFile) {
+        const mainIconPath = fileUploadService.generateFolderPath('martyrs', 'temp', 'main');
+        const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, `main-icon-${Date.now()}`);
+        mainIconUrl = mainIconResult.url;
+      }
+      
       // First create the martyr document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...martyr,
+        mainIcon: mainIconUrl,
         dob: Timestamp.fromDate(martyr.dob),
         dateOfShahada: Timestamp.fromDate(martyr.dateOfShahada),
         createdAt: Timestamp.fromDate(now),
@@ -152,7 +162,8 @@ export const martyrsService = {
     currentUserEmail?: string, 
     currentUserName?: string,
     newPhotoFiles?: File[],
-    newVideoFiles?: File[]
+    newVideoFiles?: File[],
+    mainIconFile?: File
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
@@ -160,6 +171,13 @@ export const martyrsService = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
+
+      // Upload main icon if provided
+      if (mainIconFile) {
+        const mainIconPath = fileUploadService.generateFolderPath('martyrs', id, 'main');
+        const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, 'main-icon');
+        updateData.mainIcon = mainIconResult.url;
+      }
 
       // Convert dates to Timestamp if they exist
       if (updates.dob) {
@@ -183,7 +201,7 @@ export const martyrsService = {
         newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
       }
 
-      // Only update photos/videos arrays if there are actually new files to add
+      // Only update arrays if there are actually new files to add
       if (newPhotos.length > 0 || newVideos.length > 0) {
         const existingMartyr = await this.getMartyr(id);
         if (existingMartyr) {

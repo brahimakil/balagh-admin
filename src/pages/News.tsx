@@ -35,6 +35,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
 
   const [imagePreview, setImagePreview] = useState<string>('');
 
+  // Add state
+  const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
+
   const { currentUser, currentUserData } = useAuth();
 
   useEffect(() => {
@@ -90,6 +93,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     setEditingNews(null);
     setShowForm(false);
     setImagePreview('');
+    setSelectedMainImageFile(null); // ADD THIS
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,7 +135,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
           currentUser?.email, 
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('News updated successfully');
       } else {
@@ -140,7 +145,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
           currentUser?.email!, 
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('News added successfully');
       }
@@ -173,6 +179,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     setShowForm(false);
     setError('');
     setSuccess('');
+    setSelectedMainImageFile(null); // ADD THIS
   };
 
   // Update the handleEdit function to use current date/time
@@ -198,6 +205,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     setSelectedVideos([]);
     setEditingNews(newsItem);
     setShowForm(true);
+    setSelectedMainImageFile(null); // ADD THIS
   };
 
   const handleDelete = async (id: string) => {
@@ -221,11 +229,12 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedMainImageFile(file);
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64String = e.target?.result as string;
-        handleInputChange('mainImage', base64String);
-        setImagePreview(base64String);
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        handleInputChange('mainImage', base64);
+        setImagePreview(base64);
       };
       reader.readAsDataURL(file);
     }

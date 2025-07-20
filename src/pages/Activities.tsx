@@ -37,6 +37,7 @@ const Activities: React.FC = () => {
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
 
   const { canAccessActivityType, currentUser, currentUserData } = useAuth();
 
@@ -141,7 +142,8 @@ const Activities: React.FC = () => {
           currentUser?.email, 
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Activity updated successfully');
       } else {
@@ -150,7 +152,8 @@ const Activities: React.FC = () => {
           currentUser?.email!, 
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Activity added successfully');
       }
@@ -188,6 +191,7 @@ const Activities: React.FC = () => {
     setSuccess('');
     setSelectedPhotos([]);
     setSelectedVideos([]);
+    setSelectedMainImageFile(null);
   };
 
   const handleEdit = async (activity: Activity) => {
@@ -208,6 +212,7 @@ const Activities: React.FC = () => {
       // Clear any previously selected files
       setSelectedPhotos([]);
       setSelectedVideos([]);
+      setSelectedMainImageFile(null);
       
       setEditingActivity(activityToEdit);
       setShowForm(true);
@@ -224,6 +229,7 @@ const Activities: React.FC = () => {
       setImagePreview(activity.mainImage);
       setSelectedPhotos([]);
       setSelectedVideos([]);
+      setSelectedMainImageFile(null);
       setEditingActivity(activity);
       setShowForm(true);
     }
@@ -255,11 +261,12 @@ const Activities: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedMainImageFile(file);
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64String = e.target?.result as string;
-        setFormData(prev => ({ ...prev, mainImage: base64String }));
-        setImagePreview(base64String);
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        handleInputChange('mainImage', base64);
+        setImagePreview(base64);
       };
       reader.readAsDataURL(file);
     }

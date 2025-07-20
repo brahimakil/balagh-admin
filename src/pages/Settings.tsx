@@ -24,6 +24,7 @@ const Settings: React.FC = () => {
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   const pageNames = {
     home: 'Home Page',
@@ -40,6 +41,12 @@ const Settings: React.FC = () => {
     activities: '📅',
     news: '📰'
   };
+
+  const [darkLogoFile, setDarkLogoFile] = useState<File | null>(null);
+  const [lightLogoFile, setLightLogoFile] = useState<File | null>(null);
+  const [darkLogoPreview, setDarkLogoPreview] = useState<string>('');
+  const [lightLogoPreview, setLightLogoPreview] = useState<string>('');
+  const [uploadingLogos, setUploadingLogos] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -93,13 +100,68 @@ const Settings: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
-        handleInputChange('mainImage', base64);
         setImagePreview(base64);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDarkLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDarkLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setDarkLogoPreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLightLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLightLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLightLogoPreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogoSubmit = async () => {
+    if (!darkLogoFile && !lightLogoFile) {
+      setError('Please select at least one logo to upload');
+      return;
+    }
+
+    try {
+      setUploadingLogos(true);
+      setError('');
+      
+      await websiteSettingsService.updateMainLogos(
+        darkLogoFile || undefined,
+        lightLogoFile || undefined,
+        currentUser?.email,
+        currentUserData?.fullName
+      );
+      
+      setSuccess('Main logos updated successfully!');
+      setDarkLogoFile(null);
+      setLightLogoFile(null);
+      setDarkLogoPreview('');
+      setLightLogoPreview('');
+      loadSettings();
+    } catch (error: any) {
+      console.error('Error updating logos:', error);
+      setError(`Failed to update logos: ${error.message || 'Please try again.'}`);
+    } finally {
+      setUploadingLogos(false);
     }
   };
 
@@ -112,9 +174,12 @@ const Settings: React.FC = () => {
       mainImage: '',
       colorOverlay: '#000000'
     });
+    setImagePreview('');
+    setSelectedImageFile(null);
     setEditingPage(null);
     setShowForm(false);
-    setImagePreview('');
+    setError('');
+    setSuccess('');
   };
 
   const closeForm = () => {
@@ -135,6 +200,7 @@ const Settings: React.FC = () => {
       colorOverlay: pageSettings.colorOverlay
     });
     setImagePreview(pageSettings.mainImage);
+    setSelectedImageFile(null);
     setEditingPage(pageId);
     setShowForm(true);
   };
@@ -157,11 +223,15 @@ const Settings: React.FC = () => {
       setLoading(true);
       setError('');
       
+      // Remove mainImage from formData since we'll handle it separately
+      const { mainImage, ...settingsData } = formData;
+      
       await websiteSettingsService.updatePageSettings(
         editingPage,
-        formData,
+        settingsData,
         currentUser.email,
-        currentUserData?.fullName
+        currentUserData?.fullName,
+        selectedImageFile || undefined
       );
       
       setSuccess(`${pageNames[editingPage]} updated successfully!`);
@@ -221,6 +291,70 @@ const Settings: React.FC = () => {
       {/* Error/Success Messages */}
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
+
+      {/* Main Logo Settings */}
+      <div className="settings-section">
+        <div className="section-header">
+          <h2>🎨 Main Logo Settings</h2>
+          <p>Upload logos for dark and light modes</p>
+        </div>
+        
+        <div className="logo-upload-container">
+          <div className="logo-upload-row">
+            <div className="logo-upload-group">
+              <label>Dark Logo</label>
+              <small className="logo-note">Use a dark-colored logo for dark backgrounds</small>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleDarkLogoUpload}
+                className="file-input"
+              />
+              {darkLogoPreview && (
+                <div className="logo-preview">
+                  <img src={darkLogoPreview} alt="Dark Logo Preview" />
+                </div>
+              )}
+              {settings?.mainLogoDark && !darkLogoPreview && (
+                <div className="logo-preview">
+                  <img src={settings.mainLogoDark} alt="Current Dark Logo" />
+                  <span className="logo-label">Current Dark Logo</span>
+                </div>
+              )}
+            </div>
+
+            <div className="logo-upload-group">
+              <label>Light Logo</label>
+              <small className="logo-note">Use a light-colored logo for light backgrounds</small>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLightLogoUpload}
+                className="file-input"
+              />
+              {lightLogoPreview && (
+                <div className="logo-preview">
+                  <img src={lightLogoPreview} alt="Light Logo Preview" />
+                </div>
+              )}
+              {settings?.mainLogoLight && !lightLogoPreview && (
+                <div className="logo-preview">
+                  <img src={settings.mainLogoLight} alt="Current Light Logo" />
+                  <span className="logo-label">Current Light Logo</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button 
+            className="upload-logos-btn"
+            onClick={handleLogoSubmit}
+            disabled={uploadingLogos || (!darkLogoFile && !lightLogoFile)}
+          >
+            {uploadingLogos ? 'Uploading...' : 'Update Logos'}
+          </button>
+        </div>
+      </div>
 
       {/* Pages Grid */}
       <div className="settings-grid">

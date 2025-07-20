@@ -88,14 +88,24 @@ export const newsService = {
     currentUserEmail: string, 
     currentUserName?: string,
     photoFiles?: File[],
-    videoFiles?: File[]
+    videoFiles?: File[],
+    mainImageFile?: File
   ): Promise<string> {
     try {
       const now = new Date();
       
+      // Upload main image if provided
+      let mainImageUrl = news.mainImage; // Keep existing if no new file
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('news', 'temp', 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, `main-image-${Date.now()}`);
+        mainImageUrl = mainImageResult.url;
+      }
+      
       // First create the news document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...news,
+        mainImage: mainImageUrl,
         publishDate: news.publishDate ? Timestamp.fromDate(news.publishDate) : null,
         liveStartTime: news.liveStartTime ? Timestamp.fromDate(news.liveStartTime) : null,
         createdAt: Timestamp.fromDate(now),
@@ -144,21 +154,29 @@ export const newsService = {
     }
   },
 
-  // Update news - UPDATE THIS METHOD
+  // Update news
   async updateNews(
     id: string, 
     updates: Partial<News>, 
     currentUserEmail?: string, 
     currentUserName?: string,
     newPhotoFiles?: File[],
-    newVideoFiles?: File[]
+    newVideoFiles?: File[],
+    mainImageFile?: File
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      const updateData = {
+      const updateData: any = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
+
+      // Upload main image if provided
+      if (mainImageFile) {
+        const mainImagePath = fileUploadService.generateFolderPath('news', id, 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, 'main-image');
+        updateData.mainImage = mainImageResult.url;
+      }
 
       // Handle date conversions
       if (updates.publishDate) {
@@ -167,6 +185,13 @@ export const newsService = {
       if (updates.liveStartTime) {
         updateData.liveStartTime = Timestamp.fromDate(updates.liveStartTime);
       }
+
+      // Remove undefined fields to prevent Firestore errors
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
 
       // Handle file uploads ONLY if there are actually new files
       let newPhotos: UploadedFile[] = [];

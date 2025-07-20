@@ -21,6 +21,7 @@ const Legends: React.FC = () => {
   });
 
   const [translating, setTranslating] = useState<string>('');
+  const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
 
   const { currentUser, currentUserData } = useAuth();
 
@@ -89,6 +90,7 @@ const Legends: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedMainImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
@@ -106,8 +108,11 @@ const Legends: React.FC = () => {
       descriptionAr: '',
       mainIcon: ''
     });
+    setSelectedMainImageFile(null);
     setEditingLegend(null);
     setShowForm(false);
+    setError('');
+    setSuccess('');
   };
 
   const closeForm = () => {
@@ -136,15 +141,17 @@ const Legends: React.FC = () => {
         await legendsService.updateLegend(
           editingLegend.id!, 
           formData as Legend, 
-          currentUser.email,  // Add user email
-          currentUserData?.fullName  // Add user name
+          currentUser.email,
+          currentUserData?.fullName,
+          selectedMainImageFile || undefined
         );
         setSuccess('Legend updated successfully!');
       } else {
         await legendsService.addLegend(
-          formData as Omit<Legend, 'id' | 'createdAt' | 'updatedAt'>, 
-          currentUser.email,  // Add user email
-          currentUserData?.fullName  // Add user name
+          { ...formData, mainIcon: '' } as Omit<Legend, 'id' | 'createdAt' | 'updatedAt'>, 
+          currentUser.email,
+          currentUserData?.fullName,
+          selectedMainImageFile || undefined
         );
         setSuccess('Legend added successfully!');
       }
@@ -167,6 +174,7 @@ const Legends: React.FC = () => {
       descriptionAr: legend.descriptionAr,
       mainIcon: legend.mainIcon
     });
+    setSelectedMainImageFile(null);
     setEditingLegend(legend);
     setShowForm(true);
   };

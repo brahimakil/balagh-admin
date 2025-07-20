@@ -15,6 +15,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
+import { fileUploadService } from './fileUploadService';
 
 export interface UserPermissions {
   dashboard: boolean;
@@ -107,36 +108,50 @@ export const usersService = {
     }
   },
 
-  // Add new admin user using secondary auth instance
-  async addAdmin(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, password: string, currentUserEmail: string, currentUserName?: string): Promise<string> {
+  // Add new admin
+  async addAdmin(
+    userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, 
+    password: string, 
+    currentUserEmail: string, 
+    currentUserName?: string,
+    profilePhotoFile?: File
+  ): Promise<string> {
     try {
-      // Create user with secondary auth instance (won't affect current user session)
+      // Upload profile photo if provided
+      let profilePhotoUrl = userData.profilePhoto || ''; // Keep existing if no new file
+      if (profilePhotoFile) {
+        const profilePhotoPath = fileUploadService.generateFolderPath('users', 'temp', 'profile');
+        const profilePhotoResult = await fileUploadService.uploadFile(profilePhotoFile, profilePhotoPath, `profile-${Date.now()}`);
+        profilePhotoUrl = profilePhotoResult.url;
+      }
+
+      // Create user in Firebase Auth using secondary app
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userData.email, password);
-      const newUserId = userCredential.user.uid;
       
       // Add user data to Firestore
       const now = new Date();
-      await addDoc(collection(db, 'users'), {
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...userData,
-        uid: newUserId, // Store the Firebase Auth UID
+        profilePhoto: profilePhotoUrl,
+        uid: userCredential.user.uid,
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
       });
       
-      // Sign out from secondary auth
+      // Sign out from secondary auth to avoid affecting current session
       await signOut(secondaryAuth);
       
       // Add notification
       await notificationsService.createCRUDNotification(
         'created',
         'admins',
-        newUserId,
+        docRef.id,
         userData.fullName || userData.email,
         currentUserEmail,
         currentUserName
       );
       
-      return newUserId;
+      return docRef.id;
     } catch (error) {
       console.error('Error adding admin:', error);
       throw error;
@@ -144,14 +159,27 @@ export const usersService = {
   },
 
   // Update user
-  async updateUser(id: string, updates: Partial<User>, currentUserEmail?: string, currentUserName?: string): Promise<void> {
+  async updateUser(
+    id: string, 
+    updates: Partial<User>, 
+    currentUserEmail?: string, 
+    currentUserName?: string,
+    profilePhotoFile?: File
+  ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       const updateData = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
-      
+
+      // Upload profile photo if provided
+      if (profilePhotoFile) {
+        const profilePhotoPath = fileUploadService.generateFolderPath('users', id, 'profile');
+        const profilePhotoResult = await fileUploadService.uploadFile(profilePhotoFile, profilePhotoPath, 'profile-photo');
+        updateData.profilePhoto = profilePhotoResult.url;
+      }
+
       await updateDoc(docRef, updateData);
       
       // Add notification if user info provided

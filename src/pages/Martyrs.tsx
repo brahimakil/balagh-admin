@@ -21,6 +21,9 @@ const Martyrs: React.FC = () => {
   const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Add this state for main image file
+  const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
+
   // Form data
   const [formData, setFormData] = useState({
     nameEn: '',
@@ -87,6 +90,7 @@ const Martyrs: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedMainImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         const base64 = event.target?.result as string;
@@ -187,9 +191,9 @@ const Martyrs: React.FC = () => {
     });
     setSelectedPhotos([]);
     setSelectedVideos([]);
+    setSelectedMainImageFile(null);
     setEditingMartyr(null);
     setShowForm(false);
-    // Don't clear error and success here - let them show on the main page
   };
 
   const closeForm = () => {
@@ -244,7 +248,6 @@ const Martyrs: React.FC = () => {
       };
 
       if (editingMartyr) {
-        // Generate high-quality QR code for updated martyr
         try {
           const qrCodeWithLogo = await generatePrintQualityQRCode({
             id: editingMartyr.id,
@@ -262,16 +265,16 @@ const Martyrs: React.FC = () => {
           martyrData as Martyr, 
           currentUser.email,
           currentUserData?.fullName,
-          selectedPhotos.length > 0 ? selectedPhotos : undefined, // Only pass if there are files
-          selectedVideos.length > 0 ? selectedVideos : undefined  // Only pass if there are files
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Martyr updated successfully!');
       } else {
-        // Generate high-quality QR code for new martyr
         let qrCodeWithLogo = '';
         try {
           qrCodeWithLogo = await generatePrintQualityQRCode({
-            id: 'temp', // Will be replaced with actual ID
+            id: 'temp',
             nameEn: martyrData.nameEn,
             nameAr: martyrData.nameAr
           }, logoPath);
@@ -280,11 +283,12 @@ const Martyrs: React.FC = () => {
         }
 
         await martyrsService.addMartyr(
-          { ...martyrData, qrCode: qrCodeWithLogo, photos: [], videos: [] } as Omit<Martyr, 'id' | 'createdAt' | 'updatedAt'>, 
+          { ...martyrData, qrCode: qrCodeWithLogo, photos: [], videos: [], mainIcon: '' } as Omit<Martyr, 'id' | 'createdAt' | 'updatedAt'>, 
           currentUser.email,
           currentUserData?.fullName,
-          selectedPhotos.length > 0 ? selectedPhotos : undefined, // Only pass if there are files
-          selectedVideos.length > 0 ? selectedVideos : undefined  // Only pass if there are files
+          selectedPhotos.length > 0 ? selectedPhotos : undefined,
+          selectedVideos.length > 0 ? selectedVideos : undefined,
+          selectedMainImageFile || undefined
         );
         setSuccess('Martyr added successfully!');
       }
@@ -314,9 +318,9 @@ const Martyrs: React.FC = () => {
       mainIcon: martyr.mainIcon
     });
     
-    // Clear any previously selected files
     setSelectedPhotos([]);
     setSelectedVideos([]);
+    setSelectedMainImageFile(null);
     
     setEditingMartyr(martyr);
     setShowForm(true);

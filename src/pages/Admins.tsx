@@ -38,6 +38,7 @@ const Admins: React.FC = () => {
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [selectedProfilePhotoFile, setSelectedProfilePhotoFile] = useState<File | null>(null);
 
   useEffect(() => {
     loadData();
@@ -122,7 +123,8 @@ const Admins: React.FC = () => {
           editingAdmin.id!, 
           userData, 
           currentUser?.email, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedProfilePhotoFile || undefined
         );
         setSuccess('Admin updated successfully');
       } else {
@@ -130,7 +132,8 @@ const Admins: React.FC = () => {
           userData, 
           formData.password, 
           currentUser?.email!, 
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedProfilePhotoFile || undefined
         );
         setSuccess('Admin created successfully');
       }
@@ -169,6 +172,7 @@ const Admins: React.FC = () => {
       }
     });
     setImagePreview('');
+    setSelectedProfilePhotoFile(null);
     setEditingAdmin(null);
     setShowForm(false);
     setError('');
@@ -199,6 +203,7 @@ const Admins: React.FC = () => {
       }
     });
     setImagePreview(admin.profilePhoto || '');
+    setSelectedProfilePhotoFile(null);
     setEditingAdmin(admin);
     setShowForm(true);
   };
@@ -224,11 +229,12 @@ const Admins: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedProfilePhotoFile(file);
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64String = e.target?.result as string;
-        handleInputChange('profilePhoto', base64String);
-        setImagePreview(base64String);
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        handleInputChange('profilePhoto', base64);
+        setImagePreview(base64);
       };
       reader.readAsDataURL(file);
     }

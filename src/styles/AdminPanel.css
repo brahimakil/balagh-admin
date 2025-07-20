@@ -6061,3 +6061,104 @@ body {
     height: 100px !important;
   }
 }
+
+/* Logo Upload Styles */
+.settings-section {
+  background: var(--card-background);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.section-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.section-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.logo-upload-container {
+  margin-top: 1.5rem;
+}
+
+.logo-upload-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.logo-upload-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.logo-upload-group label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.logo-preview {
+  position: relative;
+  max-width: 200px;
+  margin-top: 0.5rem;
+}
+
+.logo-preview img {
+  width: 100%;
+  height: auto;
+  max-height: 100px;
+  object-fit: contain;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: #f8f9fa;
+}
+
+.logo-label {
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.upload-logos-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+.upload-logos-btn:hover:not(:disabled) {
+  background: var(--primary-color-dark, #0056b3);
+}
+
+.upload-logos-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .logo-upload-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.logo-note {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}

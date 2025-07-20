@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
+import { fileUploadService } from './fileUploadService';
 
 export interface Legend {
   id?: string;
@@ -67,11 +68,26 @@ export const legendsService = {
   },
 
   // Add new legend
-  async addLegend(legend: Omit<Legend, 'id' | 'createdAt' | 'updatedAt'>, currentUserEmail: string, currentUserName?: string): Promise<string> {
+  async addLegend(
+    legend: Omit<Legend, 'id' | 'createdAt' | 'updatedAt'>, 
+    currentUserEmail: string, 
+    currentUserName?: string,
+    mainIconFile?: File
+  ): Promise<string> {
     try {
       const now = new Date();
+      
+      // Upload main icon if provided
+      let mainIconUrl = legend.mainIcon; // Keep existing if no new file
+      if (mainIconFile) {
+        const mainIconPath = fileUploadService.generateFolderPath('legends', 'temp', 'main');
+        const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, `main-icon-${Date.now()}`);
+        mainIconUrl = mainIconResult.url;
+      }
+      
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...legend,
+        mainIcon: mainIconUrl,
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
       });
@@ -94,13 +110,28 @@ export const legendsService = {
   },
 
   // Update legend
-  async updateLegend(id: string, updates: Partial<Legend>, currentUserEmail?: string, currentUserName?: string): Promise<void> {
+  async updateLegend(
+    id: string, 
+    updates: Partial<Legend>, 
+    currentUserEmail?: string, 
+    currentUserName?: string,
+    mainIconFile?: File
+  ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      await updateDoc(docRef, {
+      const updateData = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
-      });
+      };
+
+      // Upload main icon if provided
+      if (mainIconFile) {
+        const mainIconPath = fileUploadService.generateFolderPath('legends', id, 'main');
+        const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, 'main-icon');
+        updateData.mainIcon = mainIconResult.url;
+      }
+
+      await updateDoc(docRef, updateData);
       
       // Add notification if user info provided
       if (currentUserEmail && updates.nameEn) {
