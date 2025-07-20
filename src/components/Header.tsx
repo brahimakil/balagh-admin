@@ -221,6 +221,13 @@ const Header: React.FC<HeaderProps> = ({ pageTitle, onMenuToggle, isMobileMenuOp
         >
           {isDarkMode ? '☀️' : '🌙'}
         </button>
+        <button 
+          className="view-home-btn"
+          onClick={() => window.open('https://balaghuser.vercel.app/', '_blank')}
+          title="View Public Website"
+        >
+          🏠 View Home
+        </button>
         <div className="user-info">
           <div className="user-avatar">
             {currentUser?.email ? getInitials(currentUser.email) : 'U'}
