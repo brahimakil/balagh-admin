@@ -39,6 +39,9 @@ const Activities: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
 
+  // Add a separate state for file deletion loading (add this with other state variables):
+  const [deletingFile, setDeletingFile] = useState<string | null>(null); // stores the URL of file being deleted
+
   const { canAccessActivityType, currentUser, currentUserData } = useAuth();
 
   useEffect(() => {
@@ -88,6 +91,7 @@ const Activities: React.FC = () => {
     }
   };
 
+  // Fix the handleSubmit function to NOT re-upload existing files:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -127,18 +131,28 @@ const Activities: React.FC = () => {
         finalIsManuallyReactivated = false;
       }
       
+      // DON'T include photos and videos in the update data
       const activityData = {
-        ...formData,
+        activityTypeId: formData.activityTypeId,
+        nameEn: formData.nameEn,
+        nameAr: formData.nameAr,
+        descriptionEn: formData.descriptionEn,
+        descriptionAr: formData.descriptionAr,
+        isPrivate: formData.isPrivate,
+        time: formData.time,
+        mainImage: formData.mainImage,
         date: new Date(formData.date),
         durationHours: Number(formData.durationHours),
         isActive: finalIsActive,
         isManuallyReactivated: finalIsManuallyReactivated,
+        // DON'T INCLUDE photos: formData.photos - this has the old deleted files!
+        // DON'T INCLUDE videos: formData.videos - this has the old deleted files!
       };
 
       if (editingActivity) {
         await activitiesService.updateActivity(
           editingActivity.id!, 
-          activityData as Activity, 
+          activityData, // This no longer has photos/videos arrays
           currentUser?.email, 
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
@@ -147,6 +161,7 @@ const Activities: React.FC = () => {
         );
         setSuccess('Activity updated successfully');
       } else {
+        // For new activities, we DO want empty arrays
         await activitiesService.addActivity(
           { ...activityData, photos: [], videos: [] } as Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, 
           currentUser?.email!, 
@@ -308,45 +323,86 @@ const Activities: React.FC = () => {
     setSelectedVideos(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Update the removeExistingFile function with detailed debugging:
   const removeExistingFile = async (activityId: string, file: UploadedFile, fileType: 'photos' | 'videos') => {
-    if (!window.confirm(`Are you sure you want to delete this ${fileType.slice(0, -1)}?`)) return;
+    console.log('🔴 START: removeExistingFile called');
+    console.log('📝 Parameters:', { activityId, file, fileType });
+    
+    if (!window.confirm(`Are you sure you want to delete this ${fileType.slice(0, -1)}?`)) {
+      console.log('❌ User cancelled deletion');
+      return;
+    }
     
     try {
-      setLoading(true);
-      await activitiesService.removeFiles(activityId, [file], fileType);
+      console.log('🔄 Setting deletingFile state to:', file.url);
+      setDeletingFile(file.url);
+      setError('');
       
+      console.log('📞 Calling activitiesService.removeFileByUrl...');
+      console.log('📊 Current editingActivity before removal:', editingActivity);
+      
+      await activitiesService.removeFileByUrl(activityId, file.url, fileType);
+      
+      console.log('✅ Service call completed successfully');
+      
+      // Update the editingActivity state immediately
       if (editingActivity && editingActivity.id === activityId) {
+        console.log('🔄 Updating editingActivity state...');
+        console.log('📊 Current files before filter:', editingActivity[fileType]);
+        
         const updatedFiles = editingActivity[fileType]?.filter(
           existingFile => existingFile.url !== file.url
         ) || [];
         
-        setEditingActivity({
+        console.log('📊 Updated files after filter:', updatedFiles);
+        
+        const newEditingActivity = {
           ...editingActivity,
           [fileType]: updatedFiles
-        });
+        };
+        
+        console.log('📊 New editingActivity object:', newEditingActivity);
+        setEditingActivity(newEditingActivity);
+        console.log('✅ editingActivity state updated');
+      } else {
+        console.log('⚠️ editingActivity not found or ID mismatch');
       }
       
-      setActivities(prevActivities => 
-        prevActivities.map(activity => {
+      // Also update the activities list
+      console.log('🔄 Updating activities list...');
+      setActivities(prevActivities => {
+        const newActivities = prevActivities.map(activity => {
           if (activity.id === activityId) {
+            console.log('📊 Found activity to update in list:', activity);
             const updatedFiles = activity[fileType]?.filter(
               existingFile => existingFile.url !== file.url
             ) || [];
             
-            return {
+            const updatedActivity = {
               ...activity,
               [fileType]: updatedFiles
             };
+            console.log('📊 Updated activity for list:', updatedActivity);
+            return updatedActivity;
           }
           return activity;
-        })
-      );
+        });
+        console.log('📊 New activities array:', newActivities);
+        return newActivities;
+      });
       
+      console.log('✅ Activities list updated');
       setSuccess(`${fileType.slice(0, -1)} deleted successfully`);
-    } catch (error) {
-      setError(`Failed to delete ${fileType.slice(0, -1)}`);
+      console.log('✅ Success message set');
+      
+    } catch (error: any) {
+      console.error('❌ ERROR in removeExistingFile:', error);
+      console.error('📊 Error details:', error.message, error.stack);
+      setError(`Failed to delete ${fileType.slice(0, -1)}: ${error.message || error}`);
     } finally {
-      setLoading(false);
+      console.log('🔄 Clearing deletingFile state');
+      setDeletingFile(null);
+      console.log('🔴 END: removeExistingFile completed');
     }
   };
 
@@ -905,11 +961,11 @@ const Activities: React.FC = () => {
                   )}
 
                   {editingActivity && editingActivity.photos && editingActivity.photos.length > 0 && (
-                    <div className="file-preview-grid">
+                    <div className="file-preview-grid" key={`photos-${editingActivity.photos.length}`}>
                       <h4>Existing Photos ({editingActivity.photos.length})</h4>
                       <div className="preview-grid">
                         {editingActivity.photos.map((photo, index) => (
-                          <div key={index} className="preview-item">
+                          <div key={`photo-${index}-${photo.url}`} className="preview-item">
                             <img 
                               src={photo.url} 
                               alt={`Photo ${index + 1}`} 
@@ -919,8 +975,9 @@ const Activities: React.FC = () => {
                               type="button"
                               className="remove-file-btn"
                               onClick={() => removeExistingFile(editingActivity.id!, photo, 'photos')}
+                              disabled={deletingFile === photo.url}
                             >
-                              ×
+                              {deletingFile === photo.url ? '...' : '×'}
                             </button>
                             <span className="file-name">{photo.fileName}</span>
                           </div>
@@ -983,8 +1040,9 @@ const Activities: React.FC = () => {
                               type="button"
                               className="remove-file-btn"
                               onClick={() => removeExistingFile(editingActivity.id!, video, 'videos')}
+                              disabled={deletingFile === video.url}
                             >
-                              ×
+                              {deletingFile === video.url ? '...' : '×'}
                             </button>
                             <span className="file-name">{video.fileName}</span>
                           </div>

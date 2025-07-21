@@ -131,18 +131,19 @@ export const activitiesService = {
     try {
       const now = new Date();
       
-      // Upload main image if provided
-      let mainImageUrl = activity.mainImage; // Keep existing if no new file
+      // Upload main image first if provided
+      let mainImageUrl = '';
       if (mainImageFile) {
-        const mainImagePath = fileUploadService.generateFolderPath('activities', 'temp', 'main');
-        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, mainImagePath, `main-image-${Date.now()}`);
+        // Use a temporary path first, then we'll update it with the real document ID
+        const tempMainImagePath = fileUploadService.generateFolderPath('activities', 'temp', 'main');
+        const mainImageResult = await fileUploadService.uploadFile(mainImageFile, tempMainImagePath, `main-image-${Date.now()}`);
         mainImageUrl = mainImageResult.url;
       }
       
-      // First create the activity document to get the ID
+      // Create the activity document with the main image URL
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...activity,
-        mainImage: mainImageUrl,
+        mainImage: mainImageUrl, // Firebase Storage URL, not base64
         date: Timestamp.fromDate(activity.date),
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
@@ -150,7 +151,26 @@ export const activitiesService = {
         videos: [],
       });
 
-      // Upload files if provided
+      // Now upload the main image to the proper location with document ID
+      if (mainImageFile) {
+        const properMainImagePath = fileUploadService.generateFolderPath('activities', docRef.id, 'main');
+        const properMainImageResult = await fileUploadService.uploadFile(mainImageFile, properMainImagePath, 'main-image');
+        
+        // Update document with proper main image URL
+        await updateDoc(docRef, {
+          mainImage: properMainImageResult.url,
+          updatedAt: Timestamp.fromDate(new Date()),
+        });
+        
+        // Delete the temporary main image
+        try {
+          await fileUploadService.deleteMultipleFiles([mainImageUrl]);
+        } catch (deleteError) {
+          console.warn('Could not delete temporary main image:', deleteError);
+        }
+      }
+
+      // Upload other files if provided
       let photos: UploadedFile[] = [];
       let videos: UploadedFile[] = [];
 
@@ -164,7 +184,7 @@ export const activitiesService = {
         videos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
       }
 
-      // Update the document with file URLs
+      // Update the document with file URLs if any
       if (photos.length > 0 || videos.length > 0) {
         await updateDoc(docRef, {
           photos,
@@ -202,10 +222,14 @@ export const activitiesService = {
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      const updateData = {
+      const updateData: any = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
+
+      // Remove photos and videos from updateData if they exist
+      delete updateData.photos;
+      delete updateData.videos;
 
       // Upload main image if provided
       if (mainImageFile) {
@@ -218,36 +242,35 @@ export const activitiesService = {
         updateData.date = Timestamp.fromDate(updates.date);
       }
 
-      // Handle file uploads ONLY if there are actually new files
-      let newPhotos: UploadedFile[] = [];
-      let newVideos: UploadedFile[] = [];
-
+      // ONLY handle photo/video arrays if there are NEW files to add
       if (newPhotoFiles && newPhotoFiles.length > 0) {
-        const photoFolderPath = fileUploadService.generateFolderPath('activities', id, 'photos');
-        newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
+        const currentDocSnap = await getDoc(docRef);
+        if (currentDocSnap.exists()) {
+          const currentData = currentDocSnap.data();
+          const currentPhotos = currentData.photos || [];
+          
+          const photoFolderPath = fileUploadService.generateFolderPath('activities', id, 'photos');
+          const newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
+          
+          updateData.photos = [...currentPhotos, ...newPhotos];
+        }
       }
 
       if (newVideoFiles && newVideoFiles.length > 0) {
-        const videoFolderPath = fileUploadService.generateFolderPath('activities', id, 'videos');
-        newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
-      }
-
-      // Only update arrays if there are actually new files to add
-      if (newPhotos.length > 0 || newVideos.length > 0) {
-        const existingActivity = await this.getActivity(id);
-        if (existingActivity) {
-          if (newPhotos.length > 0) {
-            updateData.photos = [...(existingActivity.photos || []), ...newPhotos];
-          }
-          if (newVideos.length > 0) {
-            updateData.videos = [...(existingActivity.videos || []), ...newVideos];
-          }
+        const currentDocSnap = await getDoc(docRef);
+        if (currentDocSnap.exists()) {
+          const currentData = currentDocSnap.data();
+          const currentVideos = currentData.videos || [];
+          
+          const videoFolderPath = fileUploadService.generateFolderPath('activities', id, 'videos');
+          const newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
+          
+          updateData.videos = [...currentVideos, ...newVideos];
         }
       }
       
       await updateDoc(docRef, updateData);
       
-      // Add notification if user info provided
       if (currentUserEmail && updates.nameEn) {
         await notificationsService.createCRUDNotification(
           'updated',
@@ -303,34 +326,69 @@ export const activitiesService = {
     }
   },
 
-  // Remove specific photos or videos
-  async removeFiles(
+  // Update the removeFileByUrl method with debugging:
+  async removeFileByUrl(
     activityId: string, 
-    filesToRemove: UploadedFile[], 
+    fileUrl: string,
     fileType: 'photos' | 'videos'
   ): Promise<void> {
+    console.log('🔴 START: removeFileByUrl service method');
+    console.log('📝 Parameters:', { activityId, fileUrl, fileType });
+    
     try {
-      // Delete files from storage
-      const fileUrls = filesToRemove.map(f => f.url);
-      await fileUploadService.deleteMultipleFiles(fileUrls);
-
-      // Update document
-      const activity = await this.getActivity(activityId);
-      if (activity) {
-        const currentFiles = activity[fileType] || [];
-        const updatedFiles = currentFiles.filter(
-          file => !filesToRemove.some(removeFile => removeFile.url === file.url)
-        );
-
-        const updateData = {
-          [fileType]: updatedFiles,
-          updatedAt: Timestamp.fromDate(new Date()),
-        };
-
-        await updateDoc(doc(db, COLLECTION_NAME, activityId), updateData);
+      console.log('📞 Getting document from Firestore...');
+      // Get current activity data from Firestore
+      const docRef = doc(db, COLLECTION_NAME, activityId);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        console.error('❌ Document not found:', activityId);
+        throw new Error(`Activity ${activityId} not found`);
       }
+      
+      console.log('✅ Document found');
+      const currentData = docSnap.data();
+      console.log('📊 Current document data:', currentData);
+      
+      const currentFiles = currentData[fileType] || [];
+      console.log('📊 Current files array:', currentFiles);
+      
+      // Find the file with matching URL
+      const fileToRemove = currentFiles.find((file: UploadedFile) => file.url === fileUrl);
+      console.log('📊 File to remove:', fileToRemove);
+      
+      if (!fileToRemove) {
+        console.error('❌ File not found in array:', fileUrl);
+        throw new Error(`File with URL ${fileUrl} not found in ${fileType} array`);
+      }
+      
+      // Remove the file with matching URL from the array
+      const updatedFiles = currentFiles.filter((file: UploadedFile) => file.url !== fileUrl);
+      console.log('📊 Updated files array:', updatedFiles);
+
+      console.log('📞 Updating Firestore document...');
+      // Update the Firestore document first (remove from photos/videos array)
+      await updateDoc(docRef, {
+        [fileType]: updatedFiles,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
+      
+      console.log('✅ Firestore document updated successfully');
+      
+      // Then delete from Firebase Storage
+      console.log('📞 Deleting from Firebase Storage...');
+      try {
+        await fileUploadService.deleteMultipleFiles([fileUrl]);
+        console.log('✅ File deleted from Firebase Storage:', fileUrl);
+      } catch (storageError) {
+        console.warn('⚠️ File could not be deleted from storage (but removed from database):', storageError);
+        // Don't throw error - database update was successful
+      }
+      
+      console.log('✅ removeFileByUrl completed successfully');
+      
     } catch (error) {
-      console.error(`Error removing ${fileType}:`, error);
+      console.error('❌ ERROR in removeFileByUrl:', error);
       throw error;
     }
   },
