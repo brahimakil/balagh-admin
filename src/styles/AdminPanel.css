@@ -6191,3 +6191,144 @@ body {
     font-size: 0.8rem;
   }
 }
+
+/* Desktop Sidebar Collapse Styles */
+@media (min-width: 1025px) {
+  /* Show the mobile menu button on desktop too */
+  .mobile-menu-button {
+    display: block !important;
+  }
+
+  /* Collapsed sidebar styles */
+  .sidebar.sidebar-collapsed {
+    width: 80px;
+    transition: width 0.3s ease;
+  }
+
+  .sidebar.sidebar-collapsed .sidebar-header h2 {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .sidebar.sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding: 12px 8px;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .sidebar.sidebar-collapsed .nav-item-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .sidebar.sidebar-collapsed .nav-item-icon {
+    font-size: 18px;
+  }
+
+  .sidebar.sidebar-collapsed .nav-item-text {
+    font-size: 10px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60px;
+  }
+
+  .sidebar.sidebar-collapsed .notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+  }
+
+  .sidebar.sidebar-collapsed .logout-button {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .sidebar.sidebar-collapsed .logout-icon {
+    font-size: 18px;
+  }
+
+  .sidebar.sidebar-collapsed .logout-text {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  /* Main content adjustments */
+  .admin-layout.sidebar-collapsed .main-content {
+    margin-left: 80px;
+    width: calc(100% - 80px);
+    transition: margin-left 0.3s ease, width 0.3s ease;
+  }
+
+  /* RTL support for collapsed sidebar */
+  .rtl-layout.sidebar-collapsed .sidebar {
+    width: 80px;
+  }
+
+  .rtl-layout.sidebar-collapsed .main-content {
+    margin-right: 80px;
+    margin-left: 0;
+    width: calc(100% - 80px);
+  }
+}
+
+/* Navigation item structure */
+.nav-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.nav-item-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.nav-item-text {
+  flex: 1;
+}
+
+/* Logout button structure */
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logout-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.logout-text {
+  flex: 1;
+}
+
+/* Add black background for light logo preview */
+.logo-preview img[alt*="Light"] {
+  background: #000000 !important;
+}
+
+/* Or more specifically target the light logo preview */
+.logo-preview:has(img[alt*="Light"]) img {
+  background: #000000 !important;
+}
+
+/* Alternative approach - add a specific class */
+.logo-preview.light-logo img {
+  background: #000000 !important;
+}

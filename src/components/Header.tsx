@@ -7,6 +7,7 @@ interface HeaderProps {
   pageTitle: string;
   onMenuToggle: () => void;
   isMobileMenuOpen: boolean;
+  isDesktopSidebarCollapsed?: boolean;
 }
 
 // Declare Google Translate types
@@ -17,7 +18,12 @@ declare global {
   }
 }
 
-const Header: React.FC<HeaderProps> = ({ pageTitle, onMenuToggle, isMobileMenuOpen }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  pageTitle, 
+  onMenuToggle, 
+  isMobileMenuOpen,
+  isDesktopSidebarCollapsed = false 
+}) => {
   const { currentUser } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const { currentLanguage, toggleLanguage } = useTranslation();
@@ -175,6 +181,7 @@ const Header: React.FC<HeaderProps> = ({ pageTitle, onMenuToggle, isMobileMenuOp
           className="mobile-menu-button"
           onClick={onMenuToggle}
           aria-label="Toggle menu"
+          title={window.innerWidth > 1024 ? (isDesktopSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar') : 'Toggle menu'}
         >
           <div className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}>
             <span></span>

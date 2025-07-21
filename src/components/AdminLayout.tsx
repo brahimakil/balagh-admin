@@ -22,7 +22,14 @@ const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission, currentUserData } = useAuth();
+  
+  // Separate states for mobile and desktop sidebar
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
+    // Load saved state from localStorage, default to false (expanded)
+    const saved = localStorage.getItem('desktopSidebarCollapsed');
+    return saved === 'true';
+  });
 
   // Get current page from URL
   const getCurrentPage = () => {
@@ -36,6 +43,11 @@ const AdminLayout: React.FC = () => {
   useEffect(() => {
     setActiveItem(getCurrentPage());
   }, [location]);
+
+  // Save desktop sidebar state to localStorage
+  useEffect(() => {
+    localStorage.setItem('desktopSidebarCollapsed', isDesktopSidebarCollapsed.toString());
+  }, [isDesktopSidebarCollapsed]);
 
   // Check permissions and redirect if necessary
   useEffect(() => {
@@ -118,7 +130,13 @@ const AdminLayout: React.FC = () => {
   };
 
   const handleMenuToggle = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+    if (window.innerWidth > 1024) {
+      // Desktop: toggle sidebar collapse
+      setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed);
+    } else {
+      // Mobile: toggle mobile menu
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    }
   };
 
   const handleMenuClose = () => {
@@ -127,24 +145,28 @@ const AdminLayout: React.FC = () => {
 
   const handleItemClick = (item: string) => {
     navigate(`/admin/${item}`);
+    // Only close sidebar on mobile
     if (window.innerWidth <= 1024) {
       setIsMobileMenuOpen(false);
     }
+    // On desktop, keep sidebar open
   };
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout ${isDesktopSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Sidebar 
         activeItem={activeItem} 
         onItemClick={handleItemClick}
         isOpen={isMobileMenuOpen}
         onClose={handleMenuClose}
+        isDesktopCollapsed={isDesktopSidebarCollapsed}
       />
       <div className="main-content">
         <Header 
           pageTitle={getPageTitle(activeItem)}
           onMenuToggle={handleMenuToggle}
           isMobileMenuOpen={isMobileMenuOpen}
+          isDesktopSidebarCollapsed={isDesktopSidebarCollapsed}
         />
         <main className="content">
           <Routes>

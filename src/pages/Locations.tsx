@@ -347,17 +347,17 @@ const Locations: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this location?')) return;
     
-    try {
-      await locationsService.deleteLocation(
-        id, 
+      try {
+        await locationsService.deleteLocation(
+          id, 
         locations.find(l => l.id === id)?.nameEn || 'Location', 
         currentUser?.email!, 
         currentUserData?.fullName
-      );
-      setSuccess('Location deleted successfully!');
-      loadData();
+        );
+        setSuccess('Location deleted successfully!');
+        loadData();
     } catch (error) {
-      setError('Failed to delete location');
+        setError('Failed to delete location');
     }
   };
 

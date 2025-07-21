@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
   onSwitchToSignup: () => void;
@@ -13,6 +17,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   const validateForm = () => {
     if (!email.trim()) {
@@ -31,16 +36,57 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    if (!email || !password) {
+      setError('Please fill in all fields');
       return;
     }
 
     try {
-      setError('');
       setLoading(true);
-      await login(email.trim(), password);
+      setError('');
+      
+      // Sign in with Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Check if user is an admin by looking up their document
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (!userDocSnap.exists()) {
+        // User document doesn't exist - not an admin
+        await auth.signOut(); // Sign them out
+        setError('Access denied. This account is not authorized for admin access.');
+        return;
+      }
+      
+      const userData = userDocSnap.data();
+      
+      if (!userData.role || !['main', 'secondary'].includes(userData.role)) {
+        // User exists but doesn't have admin role
+        await auth.signOut(); // Sign them out
+        setError('Access denied. This account does not have admin privileges.');
+        return;
+      }
+      
+      // User is a valid admin - proceed to dashboard
+      navigate('/admin/dashboard');
+      
     } catch (error: any) {
-      setError(error.message || 'Failed to login. Please try again.');
+      console.error('Login error:', error);
+      
+      // Handle Firebase Auth errors
+      if (error.code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else if (error.code === 'auth/wrong-password') {
+        setError('Incorrect password.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
+      } else if (error.code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please try again later.');
+      } else {
+        setError('Login failed. Please check your credentials and try again.');
+      }
     } finally {
       setLoading(false);
     }

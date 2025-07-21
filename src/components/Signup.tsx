@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 interface SignupProps {
   onSwitchToLogin: () => void;
@@ -17,6 +21,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   const validateForm = () => {
     if (!firstName.trim()) {
@@ -76,23 +81,32 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
       setSuccess('');
       setLoading(true);
       
-      await signup(email.trim(), password, {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        fullName: `${firstName.trim()} ${lastName.trim()}`
-      });
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       
-      setSuccess('Account created successfully! You will be redirected to the dashboard.');
+      // Save user data to Firestore using the user's UID as document ID
+      const now = new Date();
+      const userData = {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        fullName: `${firstName} ${lastName}`.trim(),
+        role: 'main', // or 'secondary'
+        createdAt: Timestamp.fromDate(now),
+        updatedAt: Timestamp.fromDate(now),
+        uid: user.uid
+      };
       
-      // Clear form
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-      setFirstName('');
-      setLastName('');
+      // Use setDoc with user.uid as document ID
+      await setDoc(doc(db, 'users', user.uid), userData);
+      
+      // Redirect to dashboard
+      navigate('/admin/dashboard');
       
     } catch (error: any) {
-      setError(error.message || 'Failed to create account. Please try again.');
+      console.error('Registration error:', error);
+      setError(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }

@@ -9,7 +9,8 @@ import {
   query,
   orderBy,
   where,
-  Timestamp 
+  Timestamp,
+  setDoc
 } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
@@ -130,7 +131,7 @@ export const usersService = {
       
       // Add user data to Firestore
       const now = new Date();
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      await setDoc(doc(db, COLLECTION_NAME, userCredential.user.uid), {
         ...userData,
         profilePhoto: profilePhotoUrl,
         uid: userCredential.user.uid,
@@ -145,13 +146,13 @@ export const usersService = {
       await notificationsService.createCRUDNotification(
         'created',
         'admins',
-        docRef.id,
+        userCredential.user.uid,
         userData.fullName || userData.email,
         currentUserEmail,
         currentUserName
       );
       
-      return docRef.id;
+      return userCredential.user.uid;
     } catch (error) {
       console.error('Error adding admin:', error);
       throw error;
@@ -168,7 +169,7 @@ export const usersService = {
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      const updateData = {
+      const updateData: any = {
         ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
@@ -179,6 +180,13 @@ export const usersService = {
         const profilePhotoResult = await fileUploadService.uploadFile(profilePhotoFile, profilePhotoPath, 'profile-photo');
         updateData.profilePhoto = profilePhotoResult.url;
       }
+
+      // Remove undefined fields to prevent Firestore errors
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
 
       await updateDoc(docRef, updateData);
       

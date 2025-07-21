@@ -333,12 +333,12 @@ const Settings: React.FC = () => {
                 className="file-input"
               />
               {lightLogoPreview && (
-                <div className="logo-preview">
+                <div className="logo-preview light-logo">
                   <img src={lightLogoPreview} alt="Light Logo Preview" />
                 </div>
               )}
               {settings?.mainLogoLight && !lightLogoPreview && (
-                <div className="logo-preview">
+                <div className="logo-preview light-logo">
                   <img src={settings.mainLogoLight} alt="Current Light Logo" />
                   <span className="logo-label">Current Light Logo</span>
                 </div>

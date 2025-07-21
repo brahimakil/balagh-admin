@@ -7,9 +7,16 @@ interface SidebarProps {
   onItemClick: (item: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  isDesktopCollapsed?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  activeItem, 
+  onItemClick, 
+  isOpen, 
+  onClose,
+  isDesktopCollapsed = false 
+}) => {
   const { logout, hasPermission, currentUserData } = useAuth();
   const { unreadCount } = useNotifications();
 
@@ -57,9 +64,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isOpen, onCl
       {isOpen && <div className="mobile-overlay" onClick={onClose}></div>}
       
       {/* Sidebar */}
-      <div className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
+      <div className={`sidebar ${isOpen ? 'sidebar-open' : ''} ${isDesktopCollapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="sidebar-header">
-          <h2>Admin Panel</h2>
+          <h2>{isDesktopCollapsed ? 'AP' : 'Admin Panel'}</h2>
           <button 
             className="sidebar-close-btn"
             onClick={onClose}
@@ -75,8 +82,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isOpen, onCl
               key={item.id}
               className={`nav-item ${activeItem === item.id ? 'active' : ''} ${item.id === 'notifications' ? 'notifications-item' : ''}`}
               onClick={() => onItemClick(item.id)}
+              title={isDesktopCollapsed ? item.label : undefined}
             >
-              {item.label}
+              <span className="nav-item-content">
+                <span className="nav-item-icon">
+                  {item.label.split(' ')[0]}
+                </span>
+                <span className="nav-item-text">
+                  {item.label.substring(item.label.indexOf(' ') + 1)}
+                </span>
+              </span>
               {item.id === 'notifications' && unreadCount > 0 && (
                 <span className="notification-badge">{unreadCount}</span>
               )}
@@ -84,8 +99,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onItemClick, isOpen, onCl
           ))}
         </nav>
         
-        <button className="logout-button" onClick={handleLogout}>
-          🚪 Logout
+        <button className="logout-button" onClick={handleLogout} title={isDesktopCollapsed ? '🚪 Logout' : undefined}>
+          <span className="logout-icon">🚪</span>
+          <span className="logout-text">Logout</span>
         </button>
       </div>
     </>
