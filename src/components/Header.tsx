@@ -230,7 +230,7 @@ const Header: React.FC<HeaderProps> = ({
         </button>
         <button 
           className="view-home-btn"
-          onClick={() => window.open('https://balaghuser.vercel.app/', '_blank')}
+          onClick={() => window.open('https://www.balaghlb.com/', '_blank')}
           title="View Public Website"
         >
           🏠 View Home

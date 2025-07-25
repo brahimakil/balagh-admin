@@ -11,7 +11,7 @@ export const generateMartyrQRCode = async (
   return new Promise((resolve, reject) => {
     // Generate QR code data with timestamp to make each one unique
     const timestamp = Date.now();
-    const qrData = `https://balaghuser.vercel.app/martyrs/${martyr.id}?t=${timestamp}`;
+    const qrData = `https://www.balaghlb.com/martyrs/${martyr.id}?t=${timestamp}`;
 
     console.log('🔗 Generating QR Code for URL:', qrData);
     console.log('🖼️ Logo path received:', logoPath);
@@ -133,7 +133,7 @@ export const generatePrintQualityQRCode = async (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const timestamp = Date.now();
-    const qrData = `https://balaghuser.vercel.app/martyrs/${martyr.id}?t=${timestamp}`;
+    const qrData = `https://www.balaghlb.com/martyrs/${martyr.id}?t=${timestamp}`;
 
     console.log('🔗 Generating HIGH-QUALITY QR Code for URL:', qrData);
     console.log('🖼️ Logo path received:', logoPath);
