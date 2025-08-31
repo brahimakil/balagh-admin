@@ -62,9 +62,10 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
       
       const userData = userDocSnap.data();
       
-      if (!userData.role || !['main', 'secondary'].includes(userData.role)) {
+      // ✅ FIXED:
+      if (!userData.role || !['main', 'secondary', 'village_admin', 'village_editor'].includes(userData.role)) {
         // User exists but doesn't have admin role
-        await auth.signOut(); // Sign them out
+        await auth.signOut();
         setError('Access denied. This account does not have admin privileges.');
         return;
       }

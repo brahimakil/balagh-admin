@@ -14,6 +14,7 @@ import {
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
 import { fileUploadService, type UploadedFile } from './fileUploadService';
+import { DEFAULT_IMAGES } from '../utils/constants';
 
 export interface News {
   id?: string;
@@ -21,11 +22,11 @@ export interface News {
   titleAr: string;
   descriptionEn: string;
   descriptionAr: string;
-  type: 'regular' | 'live';
+  type: 'regular' | 'live' | 'regularLive'; // ✅ ADD regularLive type
   mainImage: string; // base64 image
   photos: UploadedFile[]; // Array of photo URLs from Firebase Storage
   videos: UploadedFile[]; // Array of video URLs from Firebase Storage
-  liveDurationHours?: number; // Only for live news
+  liveDurationHours?: number; // Only for live and regularLive news
   liveStartTime?: Date; // When live news was activated
   publishDate?: Date; // OPTIONAL for backward compatibility
   publishTime?: string; // OPTIONAL for backward compatibility
@@ -351,42 +352,48 @@ export const newsService = {
   // ADD THIS MISSING METHOD
   async updateExpiredLiveNews(): Promise<void> {
     try {
-      const now = new Date();
       const q = query(
-        collection(db, COLLECTION_NAME),
-        where('type', '==', 'live')
+        collection(db, COLLECTION_NAME), 
+        where('type', 'in', ['live', 'regularLive']), // ✅ Include regularLive
+        where('liveStartTime', '!=', null)
       );
-      
       const querySnapshot = await getDocs(q);
       
-      const updatePromises = querySnapshot.docs.map(doc => {
-        const news = {
-          id: doc.id,
-          ...doc.data(),
-          liveStartTime: doc.data().liveStartTime?.toDate(),
-          liveDurationHours: doc.data().liveDurationHours || 2,
+      const now = new Date();
+      const updates: Promise<void>[] = [];
+      
+      for (const docSnap of querySnapshot.docs) {
+        const newsItem = {
+          id: docSnap.id,
+          ...docSnap.data(),
+          liveStartTime: docSnap.data().liveStartTime?.toDate(),
         } as News;
         
-        if (!news.liveStartTime || !news.liveDurationHours) return Promise.resolve();
-        
-        const endTime = new Date(news.liveStartTime);
-        endTime.setHours(endTime.getHours() + news.liveDurationHours);
-        
-        // If live news has expired, convert it to regular news
-        if (now >= endTime) {
-          return updateDoc(doc.ref, {
-            type: 'regular',
-            updatedAt: Timestamp.fromDate(now)
-          });
+        if (newsItem.liveStartTime && newsItem.liveDurationHours) {
+          const expiryTime = new Date(newsItem.liveStartTime.getTime() + (newsItem.liveDurationHours * 60 * 60 * 1000));
+          
+          if (now >= expiryTime) {
+            if (newsItem.type === 'live') {
+              // Existing behavior: revert to regular
+              updates.push(
+                updateDoc(doc(db, COLLECTION_NAME, newsItem.id!), {
+                  type: 'regular',
+                  liveStartTime: null,
+                  liveDurationHours: null,
+                  updatedAt: Timestamp.fromDate(new Date())
+                })
+              );
+            } else if (newsItem.type === 'regularLive') {
+              // ✅ NEW: Delete regularLive news completely
+              updates.push(this.deleteNews(newsItem.id!, newsItem.titleEn, 'system', 'System Auto-Delete'));
+            }
+          }
         }
-        
-        return Promise.resolve();
-      });
+      }
       
-      await Promise.all(updatePromises);
+      await Promise.all(updates);
     } catch (error) {
       console.error('Error updating expired live news:', error);
-      throw error;
     }
   }
 }; 

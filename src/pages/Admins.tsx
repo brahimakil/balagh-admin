@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { usersService, type User, type UserPermissions } from '../services/usersService';
 import { activityTypesService, type ActivityType } from '../services/activityTypesService';
+import { villagesService, type Village } from '../services/villagesService'; // ✅ ADD THIS
 import { useAuth } from '../context/AuthContext';
+import Villages from '../pages/Villages';
 
 const Admins: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [villages, setVillages] = useState<Village[]>([]); // ✅ ADD THIS
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<User | null>(null);
@@ -19,12 +22,14 @@ const Admins: React.FC = () => {
     password: '',
     firstName: '',
     lastName: '',
-    role: 'secondary' as 'main' | 'secondary',
+    role: 'secondary' as 'main' | 'secondary' | 'village_editor', // ✅ FIXED: village_admin
     profilePhoto: '',
     permissions: {
       dashboard: false,
       martyrs: false,
+      wars: false,
       locations: false,
+      villages: false,
       activities: false,
       activityTypes: false,
       news: false,
@@ -33,8 +38,9 @@ const Admins: React.FC = () => {
       legends: false,
       admins: false,
       settings: false,
-      allowedActivityTypes: [] as string[]
-    } as UserPermissions
+      martyrsStories: false,
+    } as UserPermissions,
+    assignedVillageId: '',
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -47,16 +53,18 @@ const Admins: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [adminsData, activityTypesData] = await Promise.all([
-        usersService.getAllAdmins(),
-        activityTypesService.getAllActivityTypes()
+      const [adminsData, activityTypesData, villagesData] = await Promise.all([
+        usersService.getAllUsers(), // ✅ FIXED: Changed from getAllAdmins to getAllUsers
+        activityTypesService.getAllActivityTypes(),
+        villagesService.getAllVillages() // ✅ ADD THIS
       ]);
       
       setAdmins(adminsData);
       setActivityTypes(activityTypesData);
-    } catch (error) {
+      setVillages(villagesData); // ✅ ADD THIS
+    } catch (error: any) {
       console.error('Error loading data:', error);
-      setError('Failed to load data');
+      setError(`Failed to load data: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -77,61 +85,50 @@ const Admins: React.FC = () => {
     }
   };
 
-  const handleActivityTypePermission = (activityTypeId: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        allowedActivityTypes: checked
-          ? [...(prev.permissions.allowedActivityTypes || []), activityTypeId]
-          : (prev.permissions.allowedActivityTypes || []).filter(id => id !== activityTypeId)
-      }
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!formData.email || (!editingAdmin && !formData.password)) {
+    
+    if (!formData.email.trim() || !formData.firstName.trim() || !formData.lastName.trim()) {
       setError('Please fill in all required fields');
       return;
     }
 
-    if (formData.role === 'secondary' && !Object.values(formData.permissions).some(p => p === true)) {
-      setError('Secondary admin must have at least one permission');
+    if (!editingAdmin && !formData.password.trim()) {
+      setError('Password is required for new users');
+      return;
+    }
+
+    if (!currentUser?.email) {
+      setError('User not authenticated');
       return;
     }
 
     try {
       setLoading(true);
+      setError('');
       
       const userData = {
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
         role: formData.role,
-        profilePhoto: formData.profilePhoto,
-        permissions: formData.role === 'main' ? undefined : formData.permissions, // Only secondary has permissions
-        createdBy: currentUser?.email || ''
+        permissions: formData.permissions,
+        assignedVillageId: formData.assignedVillageId || undefined, // ✅ ADD THIS
       };
 
       if (editingAdmin) {
-        await usersService.updateUser(
-          editingAdmin.id!, 
-          userData, 
-          currentUser?.email, 
+        await usersService.updateUser( // ✅ FIXED: Use updateUser
+          editingAdmin.id!,
+          userData,
+          currentUser?.email!,
           currentUserData?.fullName,
           selectedProfilePhotoFile || undefined
         );
         setSuccess('Admin updated successfully');
       } else {
-        await usersService.addAdmin(
-          userData, 
-          formData.password, 
-          currentUser?.email!, 
+        await usersService.addUser( // ✅ FIXED: Use addUser
+          { ...userData, password: formData.password }, // ✅ FIXED: Include password
+          currentUser?.email!,
           currentUserData?.fullName,
           selectedProfilePhotoFile || undefined
         );
@@ -159,7 +156,9 @@ const Admins: React.FC = () => {
       permissions: {
         dashboard: false,
         martyrs: false,
+        wars: false,
         locations: false,
+        villages: false, // ✅ NEW
         activities: false,
         activityTypes: false,
         news: false,
@@ -168,8 +167,9 @@ const Admins: React.FC = () => {
         legends: false,
         admins: false,
         settings: false,
-        allowedActivityTypes: []
-      }
+        martyrsStories: false, // ✅ ADD THIS
+      },
+      assignedVillageId: '', // Reset assignedVillageId
     });
     setImagePreview('');
     setSelectedProfilePhotoFile(null);
@@ -190,7 +190,9 @@ const Admins: React.FC = () => {
       permissions: admin.permissions || {
         dashboard: false,
         martyrs: false,
+        wars: false,
         locations: false,
+        villages: false, // ✅ NEW
         activities: false,
         activityTypes: false,
         news: false,
@@ -199,8 +201,9 @@ const Admins: React.FC = () => {
         legends: false,
         admins: false,
         settings: false,
-        allowedActivityTypes: []
-      }
+        martyrsStories: false, // ✅ ADD THIS
+      },
+      assignedVillageId: admin.assignedVillageId || '', // Set assignedVillageId for editing
     });
     setImagePreview(admin.profilePhoto || '');
     setSelectedProfilePhotoFile(null);
@@ -246,7 +249,9 @@ const Admins: React.FC = () => {
     const permissionNames: { [key: string]: string } = {
       dashboard: 'Dashboard',
       martyrs: 'Martyrs',
+      wars: 'Wars',
       locations: 'Locations',
+      villages: 'Villages', // ✅ NEW
       activities: 'Activities',
       activityTypes: 'Activity Types',
       news: 'News',
@@ -254,11 +259,12 @@ const Admins: React.FC = () => {
       notifications: 'Notifications',
       legends: 'Legends',
       admins: 'Admins',
-      settings: 'Settings'
+      settings: 'Settings',
+      martyrsStories: 'Martyrs Stories' // ✅ ADD THIS
     };
 
     return Object.entries(permissions)
-      .filter(([key, value]) => key !== 'allowedActivityTypes' && value === true)
+      .filter(([key, value]) => value === true)
       .map(([key]) => permissionNames[key]);
   };
 
@@ -329,11 +335,6 @@ const Admins: React.FC = () => {
                       {getPermissionsList(admin.permissions).map(permission => (
                         <span key={permission} className="permission-badge">{permission}</span>
                       ))}
-                      {admin.permissions?.activities && admin.permissions?.allowedActivityTypes && (
-                        <div className="activity-types-restriction">
-                          <small>Activity Types: {getActivityTypeNames(admin.permissions.allowedActivityTypes)}</small>
-                        </div>
-                      )}
                     </>
                   )}
                 </div>
@@ -425,18 +426,39 @@ const Admins: React.FC = () => {
                 {/* Role Selection */}
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Admin Role</label>
+                    <label>Role *</label>
                     <select
                       value={formData.role}
-                      onChange={(e) => handleInputChange('role', e.target.value)}
+                      onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as 'main' | 'secondary' | 'village_editor' }))} // ✅ ADDED: village_editor
                       required
                     >
+                      <option value="main">Main Admin</option> {/* ✅ ADDED BACK */}
                       <option value="secondary">Secondary Admin</option>
-                      <option value="main">Main Admin</option>
+                      <option value="village_editor">Village Editor</option> {/* ✅ NEW: Village Editor option */}
                     </select>
                     <small>Main admins have full access to all features</small>
                   </div>
                 </div>
+
+                {/* Village assignment - show for both secondary and village_admin */}
+                {(formData.role === 'secondary' || formData.role === 'village_editor') && ( // ✅ ADDED: village_editor
+                  <div className="form-group">
+                    <label>Assigned Village</label> {/* ✅ REMOVED: * (no longer required) */}
+                    <select
+                      value={formData.assignedVillageId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, assignedVillageId: e.target.value }))}
+                      // ✅ REMOVED: required
+                    >
+                      <option value="">No Village</option> {/* ✅ CHANGED: from "Select Village" to "No Village" */}
+                      {villages.map(village => (
+                        <option key={village.id} value={village.id}>
+                          {village.nameEn} - {village.nameAr}
+                        </option>
+                      ))}
+                    </select>
+                    <small>Leave as "No Village" for manual permission selection</small> {/* ✅ NEW: Help text */}
+                  </div>
+                )}
 
                 {/* Profile Photo */}
                 <div className="form-row">
@@ -457,8 +479,8 @@ const Admins: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Permissions (only for secondary admins) */}
-                {formData.role === 'secondary' && (
+                {/* Permissions (only for secondary admins WITHOUT village assignment) */}
+                {formData.role === 'secondary' && !formData.assignedVillageId && ( // ✅ ADDED: && !formData.assignedVillageId
                   <>
                     <div className="form-row">
                       <div className="form-group full-width">
@@ -467,15 +489,18 @@ const Admins: React.FC = () => {
                           {Object.entries({
                             dashboard: 'Dashboard',
                             martyrs: 'Martyrs',
+                            wars: '⚔️ Wars',
                             locations: 'Locations',
+                            villages: 'Villages',
                             activities: 'Activities',
                             activityTypes: 'Activity Types',
                             news: 'News',
                             liveNews: 'Live News',
                             notifications: 'Notifications',
                             legends: 'Legends',
-                            admins: 'Admins',
-                            settings: 'Settings'
+                            admins: 'Admins Management',
+                            settings: 'Website Settings',
+                            martyrsStories: 'Martyrs Stories'
                           }).map(([key, label]) => (
                             <label key={key} className="permission-checkbox">
                               <input
@@ -487,43 +512,25 @@ const Admins: React.FC = () => {
                             </label>
                           ))}
                         </div>
+                        <small>Select which pages this admin can access</small>
                       </div>
                     </div>
-
-                    {/* Activity Types Restriction */}
-                    {formData.permissions.activities && (
-                      <div className="form-row">
-                        <div className="form-group full-width">
-                          <label>Activity Types Access</label>
-                          <div className="permissions-grid">
-                            <label className="permission-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={(formData.permissions.allowedActivityTypes || []).length === 0}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    handleInputChange('permissions.allowedActivityTypes', []);
-                                  }
-                                }}
-                              />
-                              All Activity Types
-                            </label>
-                            {activityTypes.map(activityType => (
-                              <label key={activityType.id} className="permission-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={(formData.permissions.allowedActivityTypes || []).includes(activityType.id!)}
-                                  onChange={(e) => handleActivityTypePermission(activityType.id!, e.target.checked)}
-                                />
-                                {activityType.nameEn}
-                              </label>
-                            ))}
-                          </div>
-                          <small>If no specific activity types are selected, admin can access all activity types</small>
-                        </div>
-                      </div>
-                    )}
                   </>
+                )}
+
+                {/* Show info when secondary admin has village assigned */}
+                {formData.role === 'secondary' && formData.assignedVillageId && ( // ✅ NEW: Show info
+                  <div className="form-group">
+                    <div className="info-box">
+                      <p><strong>📍 Village-Assigned Secondary Admin</strong></p>
+                      <p>This admin will automatically get:</p>
+                      <ul>
+                        <li>✅ Dashboard access</li>
+                        <li>✅ Activities management (for assigned village only)</li>
+                        <li>✅ Notifications access</li>
+                      </ul>
+                    </div>
+                  </div>
                 )}
 
                 <div className="form-actions">

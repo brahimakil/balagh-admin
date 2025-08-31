@@ -3,9 +3,10 @@ import { newsService, type News } from '../services/newsService';
 import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
 import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
+import { getNewsMainImage } from '../utils/imageHelpers';
 
 interface NewsProps {
-  defaultType?: 'regular' | 'live';
+  defaultType?: 'regular' | 'live' | 'regularLive'; // ✅ Add regularLive
 }
 
 const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
@@ -26,7 +27,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     titleAr: '',
     descriptionEn: '',
     descriptionAr: '',
-    type: defaultType as 'regular' | 'live',
+    type: defaultType as 'regular' | 'live' | 'regularLive', // ✅ Add regularLive
     liveDurationHours: 2,
     mainImage: '',
     publishDate: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
@@ -84,7 +85,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       titleAr: '',
       descriptionEn: '',
       descriptionAr: '',
-      type: defaultType as 'regular' | 'live',
+      type: defaultType as 'regular' | 'live' | 'regularLive', // ✅ Update type
       liveDurationHours: 2,
       mainImage: '',
       publishDate: now.toISOString().split('T')[0],
@@ -103,12 +104,12 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
 
     if (!formData.titleEn.trim() || !formData.titleAr.trim() || 
         !formData.descriptionEn.trim() || !formData.descriptionAr.trim() || 
-        !formData.mainImage || !formData.publishDate || !formData.publishTime) {
+        !formData.publishDate || !formData.publishTime) { // ✅ Removed mainImage requirement
       setError('Please fill in all required fields');
       return;
     }
 
-    if (formData.type === 'live' && (!formData.liveDurationHours || formData.liveDurationHours < 1)) {
+    if ((formData.type === 'live' || formData.type === 'regularLive') && (!formData.liveDurationHours || formData.liveDurationHours < 1)) {
       setError('Live news duration must be at least 1 hour');
       return;
     }
@@ -120,13 +121,17 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       // Combine publish date and time to create full datetime
       const publishDateTime = new Date(`${formData.publishDate}T${formData.publishTime}`);
       
-      const newsData = {
+      const newsData: any = {
         ...formData,
         publishDate: publishDateTime,
-        // For live news, set liveStartTime to current time when editing or creating
-        liveStartTime: formData.type === 'live' ? new Date() : undefined,
-        liveDurationHours: formData.type === 'live' ? Number(formData.liveDurationHours) : undefined,
       };
+
+      // Only add live-related fields for live and regularLive news types
+      if (formData.type === 'live' || formData.type === 'regularLive') {
+        newsData.liveStartTime = new Date();
+        newsData.liveDurationHours = Number(formData.liveDurationHours);
+      }
+      // For regular news, liveStartTime and liveDurationHours are not included at all
 
       if (editingNews) {
         await newsService.updateNews(
@@ -349,7 +354,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
   };
 
   const getRemainingTime = (newsItem: News): string => {
-    if (newsItem.type !== 'live' || !newsItem.liveStartTime || !newsItem.liveDurationHours) {
+    // ✅ FIXED: Check for both 'live' and 'regularLive' types
+    if ((newsItem.type !== 'live' && newsItem.type !== 'regularLive') || 
+        !newsItem.liveStartTime || !newsItem.liveDurationHours) {
       return '';
     }
 
@@ -358,7 +365,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     endTime.setHours(endTime.getHours() + newsItem.liveDurationHours);
     
     if (now >= endTime) {
-      return 'Converting to Regular...'; // This will show briefly before the type changes
+      // ✅ UPDATED: Different messages for different types
+      return newsItem.type === 'regularLive' ? 'Deleting...' : 'Converting to Regular...';
     }
 
     const remainingMs = endTime.getTime() - now.getTime();
@@ -366,9 +374,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     const remainingMinutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
     
     if (remainingHours > 0) {
-      return `${remainingHours}h ${remainingMinutes}m left`;
+      return `${remainingHours}h ${remainingMinutes}m`;
     } else {
-      return `${remainingMinutes}m left`;
+      return `${remainingMinutes}m`;
     }
   };
 
@@ -421,11 +429,14 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
         {news.map((newsItem) => (
           <div key={newsItem.id} className="martyr-card">
             <div className="martyr-image">
-              {newsItem.mainImage ? (
-                <img src={newsItem.mainImage} alt={newsItem.titleEn} />
-              ) : (
-                <div className="martyr-placeholder">📰</div>
-              )}
+              <img 
+                src={getNewsMainImage(newsItem)} 
+                alt={newsItem.titleEn}
+                onError={(e) => {
+                  // Fallback if even the default image fails to load
+                  e.currentTarget.src = getNewsMainImage({ mainImage: DEFAULT_IMAGES.NEWS });
+                }}
+              />
               <div className="activity-status-badges">
                 {newsItem.type === 'live' && (
                   <span className="status-badge live">🔴 LIVE</span>
@@ -436,9 +447,19 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
             <div className="martyr-info">
               <h3>{newsItem.titleEn}</h3>
               <h4>{newsItem.titleAr}</h4>
-              <p className="war-name">Type: {newsItem.type === 'live' ? 'Live News' : 'Regular News'}</p>
+              <p className="war-name">Type: {
+  newsItem.type === 'live' ? 'Live News' : 
+  newsItem.type === 'regularLive' ? 'Regular Live News' : 
+  'Regular News'
+}</p>
               {newsItem.type === 'live' && (
-                <p className="family-status">⏱️ {getRemainingTime(newsItem)}</p>
+                <p className="family-status">🔴 LIVE - ⏱️ {getRemainingTime(newsItem)}</p>
+              )}
+              {newsItem.type === 'regularLive' && (
+                <p className="family-status">🔴 LIVE (Auto-Delete) - ⏱️ {getRemainingTime(newsItem)}</p>
+              )}
+              {newsItem.type === 'regular' && (
+                <p className="family-status">📰 Regular News</p>
               )}
               <p className="dates">
                 📅 {newsItem.createdAt.toLocaleDateString()} | 🕐 {newsItem.createdAt.toLocaleTimeString()}
@@ -493,12 +514,13 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                       onChange={(e) => handleInputChange('type', e.target.value)}
                       required
                     >
-                      <option value="regular">Regular News</option>
-                      <option value="live">Live News</option>
+                      <option value="regular">Regular News (added as regular news, not live)</option>
+                      <option value="live">Live News (added as live news, when finished it is reverted to regular)</option>
+                      <option value="regularLive">Regular Live News (added as live news and once finished it is completely deleted from the system)</option>
                     </select>
                   </div>
                   
-                  {formData.type === 'live' && (
+                  {(formData.type === 'live' || formData.type === 'regularLive') && (
                     <div className="form-group">
                       <label>Live Duration (Hours)</label>
                       <input
@@ -506,13 +528,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                         value={formData.liveDurationHours}
                         onChange={(e) => handleInputChange('liveDurationHours', parseInt(e.target.value) || 2)}
                         min="1"
-                        max="72"
-                        placeholder="2"
+                        max="168"
                         required
                       />
-                      <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                        How long the news stays live (1-72 hours)
-                      </small>
                     </div>
                   )}
                 </div>
@@ -594,7 +612,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                 {/* Main Image */}
                 <div className="form-row">
                   <div className="form-group full-width">
-                    <label>Main Image</label>
+                    <label>Main Image (Optional - Default image will be used if not provided)</label>
                     <input
                       type="file"
                       accept="image/*"

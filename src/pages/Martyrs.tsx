@@ -4,9 +4,11 @@ import { translationService } from '../services/translationService';
 import { generateMartyrQRCode, generatePrintQualityQRCode } from '../utils/qrCodeGenerator';
 import logoPath from '../assets/fv-logo-black.png'; // Use the existing black logo
 import { useAuth } from '../context/AuthContext';
+import { warsService, type War } from '../services/warsService'; // Add this import
 
 const Martyrs: React.FC = () => {
   const [martyrs, setMartyrs] = useState<Martyr[]>([]);
+  const [wars, setWars] = useState<War[]>([]); // Add wars state
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingMartyr, setEditingMartyr] = useState<Martyr | null>(null);
@@ -24,15 +26,21 @@ const Martyrs: React.FC = () => {
   // Add this state for main image file
   const [selectedMainImageFile, setSelectedMainImageFile] = useState<File | null>(null);
 
-  // Form data
+  // Form data - Updated with new fields
   const [formData, setFormData] = useState({
     nameEn: '',
     nameAr: '',
-    warNameEn: '',
-    warNameAr: '',
+    jihadistNameEn: '', // Changed from warNameEn
+    jihadistNameAr: '', // Changed from warNameAr
+    warId: '', // New field for war selection
     familyStatus: 'single' as 'married' | 'single',
+    numberOfChildren: 0, // New field
     dob: '',
+    placeOfBirthEn: '', // Changed from placeOfBirth
+    placeOfBirthAr: '', // New Arabic field
     dateOfShahada: '',
+    burialPlaceEn: '', // Changed from burialPlace  
+    burialPlaceAr: '', // New Arabic field
     storyEn: '',
     storyAr: '',
     mainIcon: ''
@@ -42,7 +50,20 @@ const Martyrs: React.FC = () => {
 
   useEffect(() => {
     loadMartyrs();
+    loadWars(); // Add this line
   }, []);
+
+  // Add this function
+  const loadWars = async () => {
+    try {
+      const warsData = await warsService.getAllWars();
+      setWars(warsData);
+    } catch (error) {
+      console.error('Failed to load wars:', error);
+      // Set empty array instead of failing - wars are optional for martyrs
+      setWars([]);
+    }
+  };
 
   const loadMartyrs = async () => {
     try {
@@ -68,9 +89,13 @@ const Martyrs: React.FC = () => {
     
     if (!sourceText.trim()) {
       setError('Please enter text to translate');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
+    // Clear any existing errors
+    setError('');
+    
     try {
       setTranslating(targetField);
       const translatedText = direction === 'toAr' 
@@ -78,10 +103,14 @@ const Martyrs: React.FC = () => {
         : await translationService.translateToEnglish(sourceText);
       
       handleInputChange(targetField, translatedText);
+      
+      // Show success message briefly
       setSuccess('Translation completed!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (error) {
       setError('Translation failed. Please try again.');
+      console.error('Translation error:', error);
+      setTimeout(() => setError(''), 3000);
     } finally {
       setTranslating('');
     }
@@ -180,20 +209,28 @@ const Martyrs: React.FC = () => {
     setFormData({
       nameEn: '',
       nameAr: '',
-      warNameEn: '',
-      warNameAr: '',
+      jihadistNameEn: '',
+      jihadistNameAr: '',
+      warId: '',
       familyStatus: 'single',
+      numberOfChildren: 0,
       dob: '',
+      placeOfBirthEn: '',
+      placeOfBirthAr: '',
       dateOfShahada: '',
+      burialPlaceEn: '',
+      burialPlaceAr: '',
       storyEn: '',
       storyAr: '',
       mainIcon: ''
     });
+    setEditingMartyr(null);
+    setShowForm(false);
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setSelectedMainImageFile(null);
-    setEditingMartyr(null);
-    setShowForm(false);
+    setError('');
+    setSuccess('');
   };
 
   const closeForm = () => {
@@ -223,7 +260,7 @@ const Martyrs: React.FC = () => {
     e.preventDefault();
     
     if (!formData.nameEn.trim() || !formData.nameAr.trim() || 
-        !formData.warNameEn.trim() || !formData.warNameAr.trim() || 
+        !formData.jihadistNameEn.trim() || !formData.jihadistNameAr.trim() || 
         !formData.dob || !formData.dateOfShahada || 
         !formData.storyEn.trim() || !formData.storyAr.trim() || 
         !formData.mainIcon) {
@@ -308,20 +345,21 @@ const Martyrs: React.FC = () => {
     setFormData({
       nameEn: martyr.nameEn,
       nameAr: martyr.nameAr,
-      warNameEn: martyr.warNameEn,
-      warNameAr: martyr.warNameAr,
+      jihadistNameEn: martyr.jihadistNameEn || martyr.warNameEn || '',
+      jihadistNameAr: martyr.jihadistNameAr || martyr.warNameAr || '',
+      warId: martyr.warId || '',
       familyStatus: martyr.familyStatus,
+      numberOfChildren: martyr.numberOfChildren || 0,
       dob: martyr.dob.toISOString().split('T')[0],
+      placeOfBirthEn: martyr.placeOfBirthEn || martyr.placeOfBirth || '', // Handle legacy data
+      placeOfBirthAr: martyr.placeOfBirthAr || '',
       dateOfShahada: martyr.dateOfShahada.toISOString().split('T')[0],
+      burialPlaceEn: martyr.burialPlaceEn || martyr.burialPlace || '', // Handle legacy data
+      burialPlaceAr: martyr.burialPlaceAr || '',
       storyEn: martyr.storyEn,
       storyAr: martyr.storyAr,
       mainIcon: martyr.mainIcon
     });
-    
-    setSelectedPhotos([]);
-    setSelectedVideos([]);
-    setSelectedMainImageFile(null);
-    
     setEditingMartyr(martyr);
     setShowForm(true);
   };
@@ -366,8 +404,13 @@ const Martyrs: React.FC = () => {
         nameAr: selectedMartyrQR.nameAr
       }, logoPath);
 
-      // Update the martyr with new QR code
-      await martyrsService.updateMartyr(selectedMartyrQR.id!, { qrCode: newQRCode });
+      // ✅ FIX: Update the martyr with complete object, only changing the QR code
+      await martyrsService.updateMartyr(
+        selectedMartyrQR.id!, 
+        { ...selectedMartyrQR, qrCode: newQRCode }, // Pass complete martyr object
+        currentUser?.email || '',
+        currentUserData?.nameEn
+      );
 
       // Update local state
       setSelectedMartyrQR({ ...selectedMartyrQR, qrCode: newQRCode });
@@ -603,6 +646,12 @@ const Martyrs: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  // Add this helper function
+  const getWarName = (warId: string) => {
+    const war = wars.find(w => w.id === warId);
+    return war ? `${war.nameEn} / ${war.nameAr}` : 'Unknown War';
+  };
+
  
 
  
@@ -644,13 +693,13 @@ const Martyrs: React.FC = () => {
 
       {showForm && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content large">
             <div className="modal-header">
               <h2>{editingMartyr ? 'Edit Martyr' : 'Add New Martyr'}</h2>
-              <button className="close-btn" onClick={closeForm}>×</button>
+              <button className="close-btn" onClick={resetForm}>×</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="form-container">
+            <form onSubmit={handleSubmit} className="martyr-form">
               {/* Name Fields */}
               <div className="form-row">
                 <div className="form-group">
@@ -663,8 +712,8 @@ const Martyrs: React.FC = () => {
                       placeholder="Enter name in English"
                       required
                     />
-                    <TranslateButton field="nameAr" direction="toAr">
-                      🔄 AR
+                    <TranslateButton field="nameAr" direction="toEn">
+                      🔄 EN
                     </TranslateButton>
                   </div>
                 </div>
@@ -680,76 +729,214 @@ const Martyrs: React.FC = () => {
                       required
                       dir="rtl"
                     />
-                    <TranslateButton field="nameEn" direction="toEn">
-                      🔄 EN
+                    <TranslateButton field="nameEn" direction="toAr">
+                      🔄 AR
                     </TranslateButton>
                   </div>
                 </div>
               </div>
 
-              {/* War Name Fields */}
+              {/* Jihadist Name Fields */}
               <div className="form-row">
                 <div className="form-group">
-                  <label>War Name (English)</label>
+                  <label>Jihadist Name (English) *</label>
                   <div className="input-with-translate">
                     <input
                       type="text"
-                      value={formData.warNameEn}
-                      onChange={(e) => handleInputChange('warNameEn', e.target.value)}
-                      placeholder="Enter war name in English"
+                      value={formData.jihadistNameEn}
+                      onChange={(e) => handleInputChange('jihadistNameEn', e.target.value)}
+                      placeholder="Enter jihadist name in English"
+                      required
                     />
-                    <TranslateButton field="warNameAr" direction="toAr">
-                      🔄 AR
-                    </TranslateButton>
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('jihadistNameEn', 'toAr')}
+                      disabled={translating === 'jihadistNameEn'}
+                      title="Translate from Arabic"
+                    >
+                      {translating === 'jihadistNameEn' ? '...' : '🔄'}
+                    </button>
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label>War Name (Arabic)</label>
+                  <label>Jihadist Name (Arabic) *</label>
                   <div className="input-with-translate">
                     <input
                       type="text"
-                      value={formData.warNameAr}
-                      onChange={(e) => handleInputChange('warNameAr', e.target.value)}
-                      placeholder="أدخل الاسم الحربي بالعربية"
+                      value={formData.jihadistNameAr}
+                      onChange={(e) => handleInputChange('jihadistNameAr', e.target.value)}
+                      placeholder="ادخل الاسم الجهادي بالعربية"
+                      required
                       dir="rtl"
                     />
-                    <TranslateButton field="warNameEn" direction="toEn">
-                      🔄 EN
-                    </TranslateButton>
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('jihadistNameAr', 'toEn')}
+                      disabled={translating === 'jihadistNameAr'}
+                      title="Translate from English"
+                    >
+                      {translating === 'jihadistNameAr' ? '...' : '🔄'}
+                    </button>
                   </div>
+                </div>
+              </div>
+
+              {/* War Selection */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label>War</label>
+                  <select
+                    value={formData.warId}
+                    onChange={(e) => handleInputChange('warId', e.target.value)}
+                  >
+                    <option value="">Select a war (optional)</option>
+                    {wars.length === 0 && (
+                      <option value="" disabled>No wars available - add wars in Wars Management first</option>
+                    )}
+                    {wars.map(war => (
+                      <option key={war.id} value={war.id}>
+                        {war.nameEn} / {war.nameAr}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
               {/* Personal Info */}
               <div className="form-row">
                 <div className="form-group">
-                  <label>Family Status</label>
+                  <label>Family Status *</label>
                   <select
                     value={formData.familyStatus}
                     onChange={(e) => handleInputChange('familyStatus', e.target.value)}
+                    required
                   >
                     <option value="single">Single</option>
                     <option value="married">Married</option>
                   </select>
                 </div>
 
+                {formData.familyStatus === 'married' && (
+                  <div className="form-group">
+                    <label>Number of Children</label>
+                    <input
+                      type="number"
+                      value={formData.numberOfChildren}
+                      onChange={(e) => handleInputChange('numberOfChildren', e.target.value)}
+                      min="0"
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+
                 <div className="form-group">
-                  <label>Date of Birth</label>
+                  <label>Date of Birth *</label>
                   <input
                     type="date"
                     value={formData.dob}
                     onChange={(e) => handleInputChange('dob', e.target.value)}
+                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>Date of Shahada</label>
+                  <label>Place of Birth (English)</label>
+                  <div className="input-with-translate">
+                    <input
+                      type="text"
+                      value={formData.placeOfBirthEn}
+                      onChange={(e) => handleInputChange('placeOfBirthEn', e.target.value)}
+                      placeholder="Enter place of birth in English"
+                    />
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('placeOfBirthEn', 'toAr')}
+                      disabled={translating === 'placeOfBirthEn'}
+                      title="Translate from Arabic"
+                    >
+                      {translating === 'placeOfBirthEn' ? '...' : '🔄'}
+                    </button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Place of Birth (Arabic)</label>
+                  <div className="input-with-translate">
+                    <input
+                      type="text"
+                      value={formData.placeOfBirthAr}
+                      onChange={(e) => handleInputChange('placeOfBirthAr', e.target.value)}
+                      placeholder="ادخل مكان الولادة بالعربية"
+                      dir="rtl"
+                    />
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('placeOfBirthAr', 'toEn')}
+                      disabled={translating === 'placeOfBirthAr'}
+                      title="Translate from English"
+                    >
+                      {translating === 'placeOfBirthAr' ? '...' : '🔄'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date of Shahada *</label>
                   <input
                     type="date"
                     value={formData.dateOfShahada}
                     onChange={(e) => handleInputChange('dateOfShahada', e.target.value)}
+                    min={formData.dob}
+                    required
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Burial Place (English)</label>
+                  <div className="input-with-translate">
+                    <input
+                      type="text"
+                      value={formData.burialPlaceEn}
+                      onChange={(e) => handleInputChange('burialPlaceEn', e.target.value)}
+                      placeholder="Enter burial place in English"
+                    />
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('burialPlaceEn', 'toAr')}
+                      disabled={translating === 'burialPlaceEn'}
+                      title="Translate from Arabic"
+                    >
+                      {translating === 'burialPlaceEn' ? '...' : '🔄'}
+                    </button>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Burial Place (Arabic)</label>
+                  <div className="input-with-translate">
+                    <input
+                      type="text"
+                      value={formData.burialPlaceAr}
+                      onChange={(e) => handleInputChange('burialPlaceAr', e.target.value)}
+                      placeholder="ادخل مكان الدفن بالعربية"
+                      dir="rtl"
+                    />
+                    <button
+                      type="button"
+                      className="translate-btn"
+                      onClick={() => handleTranslate('burialPlaceAr', 'toEn')}
+                      disabled={translating === 'burialPlaceAr'}
+                      title="Translate from English"
+                    >
+                      {translating === 'burialPlaceAr' ? '...' : '🔄'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -764,8 +951,8 @@ const Martyrs: React.FC = () => {
                       placeholder="Enter story in English"
                       rows={4}
                     />
-                    <TranslateButton field="storyAr" direction="toAr">
-                      🔄 Translate to Arabic
+                    <TranslateButton field="storyAr" direction="toEn">
+                      🔄 Translate to English
                     </TranslateButton>
                   </div>
                 </div>
@@ -782,8 +969,8 @@ const Martyrs: React.FC = () => {
                       rows={4}
                       dir="rtl"
                     />
-                    <TranslateButton field="storyEn" direction="toEn">
-                      🔄 Translate to English
+                    <TranslateButton field="storyEn" direction="toAr">
+                      🔄 Translate to Arabic
                     </TranslateButton>
                   </div>
                 </div>
@@ -962,14 +1149,37 @@ const Martyrs: React.FC = () => {
               </div>
             )}
             <div className="martyr-info">
-              <h3>{martyr.nameEn}</h3>
-              <h4>{martyr.nameAr}</h4>
-              {martyr.warNameEn && <p className="war-name">"{martyr.warNameEn}"</p>}
-              <p className="family-status">{martyr.familyStatus}</p>
-              <p className="dates">
-                Born: {martyr.dob.toLocaleDateString()} | 
-                Shahada: {martyr.dateOfShahada.toLocaleDateString()}
-              </p>
+              <h3 className="martyr-name">
+                <span className="name-en">{martyr.nameEn}</span>
+                <span className="name-ar">{martyr.nameAr}</span>
+              </h3>
+              <div className="jihadist-name">
+                <span className="jihadist-en">🎖️ {martyr.jihadistNameEn || martyr.warNameEn}</span>
+                <span className="jihadist-ar" dir="rtl">🎖️ {martyr.jihadistNameAr || martyr.warNameAr}</span>
+              </div>
+              {martyr.warId && (
+                <div className="war-info">
+                  ⚔️ {getWarName(martyr.warId)}
+                </div>
+              )}
+              <div className="martyr-details">
+                <span className="family-status">
+                  👨‍👩‍👧‍👦 {martyr.familyStatus === 'married' ? 'Married' : 'Single'}
+                  {martyr.familyStatus === 'married' && martyr.numberOfChildren ? ` (${martyr.numberOfChildren} children)` : ''}
+                </span>
+                <span className="birth-info">
+                  🎂 {martyr.dob.toLocaleDateString()}
+                  {martyr.placeOfBirth && ` - ${martyr.placeOfBirth}`}
+                </span>
+                <span className="shahada-info">
+                  📅 Shahada: {martyr.dateOfShahada.toLocaleDateString()}
+                </span>
+                {martyr.burialPlace && (
+                  <span className="burial-info">
+                    🕌 Buried: {martyr.burialPlace}
+                  </span>
+                )}
+              </div>
               
               {/* Display media counts */}
               <div className="media-counts">

@@ -49,11 +49,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to check activity type access
   const canAccessActivityType = (activityTypeId: string): boolean => {
     if (!currentUserData) return false;
+    // Main admin can access all activity types
     if (currentUserData.role === 'main') return true;
-    if (!currentUserData.permissions?.activities) return false;
-    
-    const allowedTypes = currentUserData.permissions.allowedActivityTypes;
-    return !allowedTypes || allowedTypes.length === 0 || allowedTypes.includes(activityTypeId);
+    // All other roles can access all activity types (no restrictions)
+    return currentUserData.permissions?.activities || false;
   };
 
   useEffect(() => {

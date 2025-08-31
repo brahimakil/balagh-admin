@@ -24,11 +24,11 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { currentUser } = useAuth();
+  const { currentUser, currentUserData } = useAuth();
 
   useEffect(() => {
-    if (!currentUser?.email) {
-      console.log('❌ No current user, clearing notifications');
+    if (!currentUser?.email || !currentUserData) {
+      console.log('❌ No current user or user data, clearing notifications');
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
@@ -44,6 +44,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       unsubscribe = notificationsService.subscribeToNotifications(
         currentUser.email,
+        currentUserData,
         (newNotifications, newUnreadCount) => {
           console.log('📬 Notifications updated:', {
             total: newNotifications.length,
@@ -63,12 +64,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Cleanup function
     return () => {
-      if (unsubscribe) {
-        console.log('🧹 Cleaning up notifications subscription');
+      console.log('🧹 Cleaning up notifications subscription');
+      if (unsubscribe && typeof unsubscribe === 'function') {
         unsubscribe();
       }
     };
-  }, [currentUser?.email]);
+  }, [currentUser?.email, currentUserData?.role, currentUserData?.assignedVillageId]);
 
   const markAsRead = async (notificationId: string) => {
     if (currentUser?.email) {

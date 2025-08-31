@@ -19,6 +19,7 @@ export interface Activity {
   id?: string;
   activityTypeId: string;
   activityTypeName?: string; // Populated from activityType
+  villageId?: string; // ✅ NEW: Optional village reference
   nameEn: string;
   nameAr: string;
   descriptionEn: string;
@@ -32,6 +33,9 @@ export interface Activity {
   mainImage: string; // base64 image
   photos: UploadedFile[]; // Array of photo URLs from Firebase Storage
   videos: UploadedFile[]; // Array of video URLs from Firebase Storage
+  status: 'approved' | 'pending' | 'rejected'; // ✅ NEW: Approval status
+  createdBy: string; // ✅ NEW: Track who created it
+  approvedBy?: string; // ✅ NEW: Track who approved it
   createdAt: Date;
   updatedAt: Date;
 }
@@ -143,8 +147,11 @@ export const activitiesService = {
       // Create the activity document with the main image URL
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...activity,
-        mainImage: mainImageUrl, // Firebase Storage URL, not base64
+        mainImage: mainImageUrl,
         date: Timestamp.fromDate(activity.date),
+        status: 'approved', // ✅ NEW: Default status (main admin activities are auto-approved)
+        createdBy: currentUserEmail, // ✅ NEW: Track creator
+        approvedBy: currentUserEmail, // ✅ NEW: Auto-approve for main admin
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
         photos: [],
@@ -455,5 +462,176 @@ export const activitiesService = {
       console.error('Error updating activity statuses:', error);
       throw error;
     }
+  },
+
+  // Add these new functions to activitiesService:
+
+  // Get activities by village ID
+  async getActivitiesByVillage(villageId: string): Promise<Activity[]> {
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME), 
+        where('villageId', '==', villageId),
+        orderBy('date', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate(),
+        photos: doc.data().photos || [],
+        videos: doc.data().videos || [],
+      } as Activity));
+    } catch (error) {
+      console.error('Error fetching activities by village:', error);
+      throw error;
+    }
+  },
+
+  // Get pending activities for village admin
+  async getPendingActivitiesByVillage(villageId: string): Promise<Activity[]> {
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('villageId', '==', villageId),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        date: doc.data().date?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate(),
+        photos: doc.data().photos || [],
+        videos: doc.data().videos || [],
+      } as Activity));
+    } catch (error) {
+      console.error('Error fetching pending activities:', error);
+      throw error;
+    }
+  },
+
+  // Approve/reject activity
+  async reviewActivity(
+    activityId: string, 
+    action: 'approve' | 'reject',
+    reviewerEmail: string,
+    reviewerName?: string
+  ): Promise<void> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, activityId);
+      
+      await updateDoc(docRef, {
+        status: action === 'approve' ? 'approved' : 'rejected',
+        approvedBy: reviewerEmail,
+        updatedAt: Timestamp.fromDate(new Date())
+      });
+      
+      // Add notification
+      await notificationsService.createCRUDNotification(
+        action === 'approve' ? 'approved' : 'rejected',
+        'activities',
+        activityId,
+        'Activity',
+        reviewerEmail,
+        reviewerName
+      );
+    } catch (error) {
+      console.error('Error reviewing activity:', error);
+      throw error;
+    }
+  },
+
+  // Submit activity as pending (for village editors)
+  async submitActivityForApproval(
+    activity: Omit<Activity, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'createdBy'>, 
+    currentUserEmail: string, 
+    currentUserName?: string,
+    photoFiles?: File[],
+    videoFiles?: File[],
+    mainImageFile?: File
+  ): Promise<string> {
+    // Same as addActivity but with status: 'pending' and no approvedBy
+    const now = new Date();
+    
+    let mainImageUrl = '';
+    if (mainImageFile) {
+      const tempMainImagePath = fileUploadService.generateFolderPath('activities', 'temp', 'main');
+      const mainImageResult = await fileUploadService.uploadFile(mainImageFile, tempMainImagePath, `main-image-${Date.now()}`);
+      mainImageUrl = mainImageResult.url;
+    }
+    
+    const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      ...activity,
+      mainImage: mainImageUrl,
+      date: Timestamp.fromDate(activity.date),
+      status: 'pending', // ✅ NEW: Pending approval
+      createdBy: currentUserEmail, // ✅ NEW: Track creator
+      // ✅ NEW: No approvedBy until approved
+      createdAt: Timestamp.fromDate(now),
+      updatedAt: Timestamp.fromDate(now),
+      photos: [],
+      videos: [],
+    });
+
+    // Now upload the main image to the proper location with document ID
+    if (mainImageFile) {
+      const properMainImagePath = fileUploadService.generateFolderPath('activities', docRef.id, 'main');
+      const properMainImageResult = await fileUploadService.uploadFile(mainImageFile, properMainImagePath, 'main-image');
+      
+      // Update document with proper main image URL
+      await updateDoc(docRef, {
+        mainImage: properMainImageResult.url,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
+      
+      // Delete the temporary main image
+      try {
+        await fileUploadService.deleteMultipleFiles([mainImageUrl]);
+      } catch (deleteError) {
+        console.warn('Could not delete temporary main image:', deleteError);
+      }
+    }
+
+    // Upload other files if provided
+    let photos: UploadedFile[] = [];
+    let videos: UploadedFile[] = [];
+
+    if (photoFiles && photoFiles.length > 0) {
+      const photoFolderPath = fileUploadService.generateFolderPath('activities', docRef.id, 'photos');
+      photos = await fileUploadService.uploadMultipleFiles(photoFiles, photoFolderPath);
+    }
+
+    if (videoFiles && videoFiles.length > 0) {
+      const videoFolderPath = fileUploadService.generateFolderPath('activities', docRef.id, 'videos');
+      videos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
+    }
+
+    // Update the document with file URLs if any
+    if (photos.length > 0 || videos.length > 0) {
+      await updateDoc(docRef, {
+        photos,
+        videos,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
+    }
+    
+    // Create notification for village admin
+    await notificationsService.createCRUDNotification(
+      'created',
+      'activities',
+      docRef.id,
+      'Activity (Pending Approval)',
+      currentUserEmail,
+      currentUserName
+    );
+    
+    return docRef.id;
   }
 }; 

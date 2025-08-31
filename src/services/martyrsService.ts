@@ -18,11 +18,17 @@ export interface Martyr {
   id?: string;
   nameEn: string;
   nameAr: string;
-  warNameEn: string;
-  warNameAr: string;
+  jihadistNameEn: string; // Changed from warNameEn
+  jihadistNameAr: string; // Changed from warNameAr
+  warId?: string; // New field to reference War document
   familyStatus: 'married' | 'single';
+  numberOfChildren?: number; // New field for married martyrs
   dob: Date;
+  placeOfBirthEn?: string; // Changed from placeOfBirth
+  placeOfBirthAr?: string; // New Arabic field
   dateOfShahada: Date;
+  burialPlaceEn?: string; // Changed from burialPlace
+  burialPlaceAr?: string; // New Arabic field
   storyEn: string;
   storyAr: string;
   mainIcon: string; // base64 image
@@ -137,6 +143,25 @@ export const martyrsService = {
           updatedAt: Timestamp.fromDate(new Date()),
         });
       }
+
+      // Now upload the main icon to the proper location with document ID if needed
+      if (mainIconFile) {
+        const properMainIconPath = fileUploadService.generateFolderPath('martyrs', docRef.id, 'main');
+        const properMainIconResult = await fileUploadService.uploadFile(mainIconFile, properMainIconPath, 'main-icon');
+        
+        // Update document with proper main icon URL
+        await updateDoc(docRef, {
+          mainIcon: properMainIconResult.url,
+          updatedAt: Timestamp.fromDate(new Date()),
+        });
+        
+        // Delete the temporary main icon
+        try {
+          await fileUploadService.deleteMultipleFiles([mainIconUrl]);
+        } catch (deleteError) {
+          console.warn('Could not delete temporary main icon:', deleteError);
+        }
+      }
       
       // Add notification
       await notificationsService.createCRUDNotification(
@@ -158,124 +183,154 @@ export const martyrsService = {
   // Update martyr
   async updateMartyr(
     id: string, 
-    updates: Partial<Martyr>, 
-    currentUserEmail?: string, 
+    martyr: Martyr,
+    currentUserEmail: string,
     currentUserName?: string,
-    newPhotoFiles?: File[],
-    newVideoFiles?: File[],
+    photoFiles?: File[],
+    videoFiles?: File[],
     mainIconFile?: File
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
-      const updateData = {
-        ...updates,
-        updatedAt: Timestamp.fromDate(new Date()),
-      };
-
+      
       // Upload main icon if provided
+      let mainIconUrl = martyr.mainIcon; // Keep existing if no new file
       if (mainIconFile) {
         const mainIconPath = fileUploadService.generateFolderPath('martyrs', id, 'main');
         const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, 'main-icon');
-        updateData.mainIcon = mainIconResult.url;
+        mainIconUrl = mainIconResult.url;
       }
 
-      // Convert dates to Timestamp if they exist
-      if (updates.dob) {
-        updateData.dob = Timestamp.fromDate(updates.dob);
-      }
-      if (updates.dateOfShahada) {
-        updateData.dateOfShahada = Timestamp.fromDate(updates.dateOfShahada);
-      }
-
-      // Handle file uploads ONLY if there are actually new files
+      // Upload new files if provided
       let newPhotos: UploadedFile[] = [];
       let newVideos: UploadedFile[] = [];
 
-      if (newPhotoFiles && newPhotoFiles.length > 0) {
+      if (photoFiles && photoFiles.length > 0) {
         const photoFolderPath = fileUploadService.generateFolderPath('martyrs', id, 'photos');
-        newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
+        newPhotos = await fileUploadService.uploadMultipleFiles(photoFiles, photoFolderPath);
       }
 
-      if (newVideoFiles && newVideoFiles.length > 0) {
+      if (videoFiles && videoFiles.length > 0) {
         const videoFolderPath = fileUploadService.generateFolderPath('martyrs', id, 'videos');
-        newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
+        newVideos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
       }
 
-      // Only update arrays if there are actually new files to add
-      if (newPhotos.length > 0 || newVideos.length > 0) {
-        const existingMartyr = await this.getMartyr(id);
-        if (existingMartyr) {
-          if (newPhotos.length > 0) {
-            updateData.photos = [...(existingMartyr.photos || []), ...newPhotos];
-          }
-          if (newVideos.length > 0) {
-            updateData.videos = [...(existingMartyr.videos || []), ...newVideos];
-          }
-        }
-      }
+      // Combine existing and new files
+      const updatedPhotos = [...(martyr.photos || []), ...newPhotos];
+      const updatedVideos = [...(martyr.videos || []), ...newVideos];
 
-      await updateDoc(docRef, updateData);
+      await updateDoc(docRef, {
+        nameEn: martyr.nameEn,
+        nameAr: martyr.nameAr,
+        jihadistNameEn: martyr.jihadistNameEn,
+        jihadistNameAr: martyr.jihadistNameAr,
+        warId: martyr.warId,
+        familyStatus: martyr.familyStatus,
+        numberOfChildren: martyr.numberOfChildren,
+        dob: Timestamp.fromDate(martyr.dob),
+        placeOfBirthEn: martyr.placeOfBirthEn,
+        placeOfBirthAr: martyr.placeOfBirthAr,
+        dateOfShahada: Timestamp.fromDate(martyr.dateOfShahada),
+        burialPlaceEn: martyr.burialPlaceEn,
+        burialPlaceAr: martyr.burialPlaceAr,
+        storyEn: martyr.storyEn,
+        storyAr: martyr.storyAr,
+        mainIcon: mainIconUrl,
+        photos: updatedPhotos,
+        videos: updatedVideos,
+        qrCode: martyr.qrCode,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
       
-      // Add notification if user info provided
-      if (currentUserEmail && updates.nameEn) {
-        await notificationsService.createCRUDNotification(
-          'updated',
-          'martyrs',
-          id,
-          updates.nameEn,
-          currentUserEmail,
-          currentUserName
-        );
-      }
+      // Add notification
+      await notificationsService.createCRUDNotification(
+        'updated',
+        'martyrs',
+        id,
+        martyr.nameEn,
+        currentUserEmail,
+        currentUserName
+      );
     } catch (error) {
       console.error('Error updating martyr:', error);
       throw error;
     }
   },
 
-  // Delete martyr - MINIMAL VERSION FOR DEBUGGING
+  // Delete martyr
   async deleteMartyr(id: string, martyrName: string, currentUserEmail: string, currentUserName?: string): Promise<void> {
     try {
-      console.log('Attempting to delete martyr with ID:', id);
+      // Get the martyr to access its files before deletion
+      const martyr = await this.getMartyr(id);
       
-      // Just delete the document, nothing else
+      if (martyr) {
+        // Collect all file URLs to delete
+        const filesToDelete: string[] = [];
+        
+        if (martyr.mainIcon) {
+          filesToDelete.push(martyr.mainIcon);
+        }
+        
+        if (martyr.photos) {
+          martyr.photos.forEach(photo => filesToDelete.push(photo.url));
+        }
+        
+        if (martyr.videos) {
+          martyr.videos.forEach(video => filesToDelete.push(video.url));
+        }
+        
+        // Delete files from storage
+        if (filesToDelete.length > 0) {
+          try {
+            await fileUploadService.deleteMultipleFiles(filesToDelete);
+          } catch (fileError) {
+            console.warn('Some files could not be deleted:', fileError);
+          }
+        }
+      }
+      
+      // Delete the document
       await deleteDoc(doc(db, COLLECTION_NAME, id));
       
-      console.log('Martyr document deleted successfully');
+      // Add notification
+      await notificationsService.createCRUDNotification(
+        'deleted',
+        'martyrs',
+        id,
+        martyrName,
+        currentUserEmail,
+        currentUserName
+      );
     } catch (error) {
-      console.error('Error deleting martyr document:', error);
+      console.error('Error deleting martyr:', error);
       throw error;
     }
   },
 
-  // Remove specific photos or videos
-  async removeFiles(
-    martyrId: string, 
-    filesToRemove: UploadedFile[], 
-    fileType: 'photos' | 'videos'
-  ): Promise<void> {
+  // Delete file from martyr
+  async deleteMartyrFile(martyrId: string, fileUrl: string, fileType: 'photo' | 'video'): Promise<void> {
     try {
-      // Delete files from storage
-      const fileUrls = filesToRemove.map(f => f.url);
-      await fileUploadService.deleteMultipleFiles(fileUrls);
+      const martyr = await this.getMartyr(martyrId);
+      if (!martyr) throw new Error('Martyr not found');
+
+      // Remove file from the array
+      if (fileType === 'photo') {
+        martyr.photos = martyr.photos.filter(photo => photo.url !== fileUrl);
+      } else {
+        martyr.videos = martyr.videos.filter(video => video.url !== fileUrl);
+      }
 
       // Update document
-      const martyr = await this.getMartyr(martyrId);
-      if (martyr) {
-        const currentFiles = martyr[fileType] || [];
-        const updatedFiles = currentFiles.filter(
-          file => !filesToRemove.some(removeFile => removeFile.url === file.url)
-        );
+      const docRef = doc(db, COLLECTION_NAME, martyrId);
+      await updateDoc(docRef, {
+        [fileType === 'photo' ? 'photos' : 'videos']: fileType === 'photo' ? martyr.photos : martyr.videos,
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
 
-        const updateData = {
-          [fileType]: updatedFiles,
-          updatedAt: Timestamp.fromDate(new Date()),
-        };
-
-        await updateDoc(doc(db, COLLECTION_NAME, martyrId), updateData);
-      }
+      // Delete file from storage
+      await fileUploadService.deleteMultipleFiles([fileUrl]);
     } catch (error) {
-      console.error(`Error removing ${fileType}:`, error);
+      console.error(`Error deleting martyr ${fileType}:`, error);
       throw error;
     }
   }

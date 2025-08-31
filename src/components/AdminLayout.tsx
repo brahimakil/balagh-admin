@@ -8,6 +8,7 @@ import Footer from './Footer';
 // Import all pages
 import Dashboard from '../pages/Dashboard';
 import Martyrs from '../pages/Martyrs';
+import Wars from '../pages/Wars';
 import Locations from '../pages/Locations';
 import Activities from '../pages/Activities';
 import ActivityTypes from '../pages/ActivityTypes';
@@ -17,80 +18,114 @@ import Notifications from '../pages/Notifications';
 import Legends from '../pages/Legends';
 import Admins from '../pages/Admins';
 import Settings from '../pages/Settings';
+import MartyrsStories from '../pages/MartyrsStories';
+import Villages from '../pages/Villages';
+
 
 const AdminLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission, currentUserData } = useAuth();
   
-  // Separate states for mobile and desktop sidebar
+  const [activeItem, setActiveItem] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
-    // Load saved state from localStorage, default to false (expanded)
-    const saved = localStorage.getItem('desktopSidebarCollapsed');
-    return saved === 'true';
-  });
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
 
-  // Get current page from URL
-  const getCurrentPage = () => {
-    const path = location.pathname.replace('/admin/', '');
-    return path || 'dashboard';
-  };
-
-  const [activeItem, setActiveItem] = useState(getCurrentPage());
-
-  // Update active item when URL changes
+  // Update active item based on current route
   useEffect(() => {
-    setActiveItem(getCurrentPage());
+    const path = location.pathname.split('/').pop() || 'dashboard';
+    setActiveItem(path);
   }, [location]);
 
-  // Save desktop sidebar state to localStorage
-  useEffect(() => {
-    localStorage.setItem('desktopSidebarCollapsed', isDesktopSidebarCollapsed.toString());
-  }, [isDesktopSidebarCollapsed]);
+  const getPageTitle = (item: string): string => {
+    const titles: { [key: string]: string } = {
+      'dashboard': 'Admin Dashboard',
+      'martyrs': 'Martyrs Management',
+      'wars': 'Wars Management',
+      'locations': 'Locations Management',
+      'villages': 'Villages Management',
+      'legends': 'Legends Management',
+      'activities': 'Activities Management',
+      'activity-types': 'Activity Types Management',
+      'news': 'News Management',
+      'live-news': 'Live News Management',
+      'notifications': 'Notifications',
+      'martyrs-stories': 'Martyrs Stories Management',
+      'admins': 'Admins Management',
+      'settings': 'Website Settings'
+    };
+    return titles[item] || 'Admin Panel';
+  };
 
-  // Check permissions and redirect if necessary
-  useEffect(() => {
-    if (currentUserData) {
-      const currentPage = getCurrentPage();
-      
-      // Map URL paths to permission names
-      const pagePermissions: { [key: string]: string } = {
-        'dashboard': 'dashboard',
+  const handleItemClick = (item: string) => {
+    // Check permissions before navigation
+    if (item !== 'dashboard' && currentUserData?.role === 'secondary') {
+      const permissionMap: { [key: string]: string } = {
         'martyrs': 'martyrs',
+        'wars': 'wars',
         'locations': 'locations',
+        'villages': 'villages',
+        'legends': 'legends',
         'activities': 'activities',
         'activity-types': 'activityTypes',
         'news': 'news',
         'live-news': 'liveNews',
         'notifications': 'notifications',
-        'legends': 'legends',
         'admins': 'admins',
         'settings': 'settings'
       };
-
-      const requiredPermission = pagePermissions[currentPage];
       
+      const requiredPermission = permissionMap[item];
       if (requiredPermission && !hasPermission(requiredPermission)) {
-        // Find the first page the user has permission to access
-        const allowedPages = Object.entries(pagePermissions).find(([, permission]) => 
-          hasPermission(permission)
-        );
-        
-        if (allowedPages) {
-          navigate(`/admin/${allowedPages[0]}`, { replace: true });
-        } else {
-          // If no permissions, logout
-          navigate('/login', { replace: true });
-        }
+        // Don't navigate if user doesn't have permission
+        return;
       }
     }
-  }, [currentUserData, location, hasPermission, navigate]);
 
-  // Close mobile menu when screen size changes
+    setActiveItem(item);
+    navigate(`/admin/${item}`);
+    
+    // Close mobile menu after selection
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleMenuToggle = () => {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    } else {
+      setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed);
+    }
+  };
+
+  const handleMenuClose = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  // Close mobile menu when clicking outside on mobile
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isMobileMenuOpen && !target.closest('.sidebar') && !target.closest('.header-menu-btn')) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    if (isMobileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileMenuOpen]);
+
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > 1024) {
+      const isMobile = window.innerWidth <= 768;
+      if (!isMobile) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -99,58 +134,34 @@ const AdminLayout: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Prevent body scroll when mobile menu is open
+  // Check permissions for the current route
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+    const currentPath = location.pathname.split('/').pop() || 'dashboard';
+    
+    if (currentPath !== 'dashboard' && currentUserData?.role === 'secondary') {
+      const permissionMap: { [key: string]: string } = {
+        'martyrs': 'martyrs',
+        'wars': 'wars',
+        'locations': 'locations',
+        'villages': 'villages',
+        'legends': 'legends',
+        'activities': 'activities',
+        'activity-types': 'activityTypes',
+        'news': 'news',
+        'live-news': 'liveNews',
+        'notifications': 'notifications',
+        'admins': 'admins',
+        'settings': 'settings'
+      };
+      
+      const requiredPermission = permissionMap[currentPath];
+      if (requiredPermission && !hasPermission(requiredPermission)) {
+        // Redirect to dashboard if user doesn't have permission
+        navigate('/admin/dashboard');
+        return;
+      }
     }
-
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isMobileMenuOpen]);
-
-  const getPageTitle = (item: string): string => {
-    const titles: { [key: string]: string } = {
-      'dashboard': 'Admin Dashboard',
-      'martyrs': 'Martyrs Management',
-      'locations': 'Locations Management',
-      'activities': 'Activities Management',
-      'activity-types': 'Activity Types Management',
-      'news': 'News Management',
-      'live-news': 'Live News Management',
-      'notifications': 'Notifications Management',
-      'legends': 'Legends Management',
-      'admins': 'Admins Management',
-      'settings': 'Website Settings'
-    };
-    return titles[item] || 'Admin Panel';
-  };
-
-  const handleMenuToggle = () => {
-    if (window.innerWidth > 1024) {
-      // Desktop: toggle sidebar collapse
-      setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed);
-    } else {
-      // Mobile: toggle mobile menu
-      setIsMobileMenuOpen(!isMobileMenuOpen);
-    }
-  };
-
-  const handleMenuClose = () => {
-    setIsMobileMenuOpen(false);
-  };
-
-  const handleItemClick = (item: string) => {
-    navigate(`/admin/${item}`);
-    // Only close sidebar on mobile
-    if (window.innerWidth <= 1024) {
-      setIsMobileMenuOpen(false);
-    }
-    // On desktop, keep sidebar open
-  };
+  }, [location, currentUserData, hasPermission, navigate]);
 
   return (
     <div className={`admin-layout ${isDesktopSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -172,7 +183,9 @@ const AdminLayout: React.FC = () => {
           <Routes>
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="martyrs" element={<Martyrs />} />
+            <Route path="wars" element={<Wars />} />
             <Route path="locations" element={<Locations />} />
+            <Route path="villages" element={<Villages />} />
             <Route path="activities" element={<Activities />} />
             <Route path="activity-types" element={<ActivityTypes />} />
             <Route path="news" element={<News />} />
@@ -181,6 +194,7 @@ const AdminLayout: React.FC = () => {
             <Route path="legends" element={<Legends />} />
             <Route path="admins" element={<Admins />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="martyrs-stories" element={<MartyrsStories />} />
             <Route path="" element={<Dashboard />} />
           </Routes>
         </main>

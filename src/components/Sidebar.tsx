@@ -27,13 +27,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   const allMenuItems = [
     { id: 'dashboard', label: '📊 Admin Dashboard', permission: 'dashboard' },
     { id: 'martyrs', label: '👥 Martyrs', permission: 'martyrs' },
+    { id: 'wars', label: '⚔️ Wars', permission: 'wars' },
     { id: 'locations', label: '📍 Locations', permission: 'locations' },
+    { id: 'villages', label: '🏘️ Villages', permission: 'villages' },
     { id: 'legends', label: '📜 Legends', permission: 'legends' },
     { id: 'activities', label: '📅 Activities', permission: 'activities' },
     { id: 'activity-types', label: '🏷️ Activity Types', permission: 'activityTypes' },
     { id: 'news', label: '📰 News', permission: 'news' },
     { id: 'live-news', label: '🔴 Live News', permission: 'liveNews' },
     { id: 'notifications', label: '🔔 Notifications', permission: 'notifications' },
+    { id: 'martyrs-stories', label: '📖 Martyrs Stories', permission: 'martyrsStories' },
     { id: 'admins', label: '👤 Admins', permission: 'admins' },
     { id: 'settings', label: '⚙️ Website Settings', permission: 'settings' },
   ];

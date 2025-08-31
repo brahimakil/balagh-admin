@@ -17,7 +17,7 @@ import { db } from '../firebase';
 
 export interface Notification {
   id?: string;
-  action: 'created' | 'updated' | 'deleted';
+  action: 'created' | 'updated' | 'deleted' | 'approved' | 'rejected'; // Add approval actions
   entityType: 'martyrs' | 'locations' | 'legends' | 'activities' | 'activityTypes' | 'news' | 'liveNews' | 'admins';
   entityId: string;
   entityName: string; // Name/title of the entity that was modified
@@ -26,6 +26,7 @@ export interface Notification {
   timestamp: Date;
   details?: string; // Additional details about what was changed
   readBy: string[]; // Array of admin emails who have read this notification
+  villageId?: string; // Link notification to village
 }
 
 const COLLECTION_NAME = 'notifications';
@@ -154,50 +155,112 @@ export const notificationsService = {
   },
 
   // Subscribe to real-time notifications updates
-  subscribeToNotifications(adminEmail: string, callback: (notifications: Notification[], unreadCount: number) => void) {
+  async subscribeToNotifications(
+    adminEmail: string, 
+    currentUserData: any, // Add user data to determine filtering
+    callback: (notifications: Notification[], unreadCount: number) => void
+  ) {
     console.log('📡 Setting up notifications subscription for:', adminEmail);
+    console.log('👤 User role:', currentUserData?.role);
+    console.log('🏘️ Assigned village:', currentUserData?.assignedVillageId);
     
-    // Use a simpler query without complex ordering that might cause issues
+    // Get base query for all notifications
     const q = query(
       collection(db, COLLECTION_NAME),
       orderBy('timestamp', 'desc'),
-      limit(100) // Increase limit to catch more notifications
+      limit(100)
     );
     
     return onSnapshot(q, 
-      (snapshot) => {
-        console.log('📬 Real-time update received! Changes:', snapshot.docChanges().length);
-        
-        // Log each change for debugging
-        snapshot.docChanges().forEach((change) => {
-          console.log(`📄 ${change.type.toUpperCase()}:`, change.doc.data());
-        });
-        
-        const notifications = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: data.timestamp?.toDate(),
-          } as Notification;
-        });
-        
-        console.log('📋 Total notifications:', notifications.length);
-        
-        const unreadCount = notifications.filter(notification => 
-          !notification.readBy?.includes(adminEmail)
-        ).length;
-        
-        console.log('🔢 Unread count for', adminEmail, ':', unreadCount);
-        
-        callback(notifications, unreadCount);
+      async (snapshot) => {
+        try {
+          console.log('📬 Real-time update received! Changes:', snapshot.docChanges().length);
+          
+          // Get all notifications first
+          const allNotifications = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              timestamp: data.timestamp?.toDate(),
+            } as Notification;
+          });
+          
+          // Apply pyramid filtering based on user role
+          let filteredNotifications: Notification[] = [];
+          
+          if (currentUserData?.role === 'main') {
+            // 🔥 MAIN ADMIN: Gets ALL notifications
+            filteredNotifications = allNotifications;
+            console.log('👑 Main admin - showing all notifications:', filteredNotifications.length);
+            
+          } else if (currentUserData?.role === 'secondary') {
+            const assignedVillageId = currentUserData?.assignedVillageId;
+            
+            if (assignedVillageId) {
+              // 🏘️ VILLAGE-ASSIGNED SECONDARY: Only same village notifications
+              console.log('🏘️ Village-assigned secondary - filtering for village:', assignedVillageId);
+              
+              // Get users from the same village (village_editors + other secondaries)
+              const sameVillageUsers = await this.getUsersFromSameVillage(assignedVillageId);
+              const sameVillageEmails = sameVillageUsers.map(user => user.email);
+              
+              filteredNotifications = allNotifications.filter(notification => 
+                sameVillageEmails.includes(notification.performedBy)
+              );
+              console.log('👥 Same village users:', sameVillageEmails);
+              
+            } else {
+              // 🌍 NON-VILLAGE SECONDARY: Check permissions
+              if (currentUserData?.permissions?.notifications) {
+                console.log('🌍 Non-village secondary with notifications permission');
+                
+                // ✅ FIX: Use synchronous filtering to avoid async issues
+                // For now, show all non-main notifications (we'll optimize later)
+                filteredNotifications = allNotifications.filter(notification => 
+                  notification.performedBy !== 'main@admin.com' // Simple filter for now
+                );
+              } else {
+                // No notifications permission
+                filteredNotifications = [];
+                console.log('❌ Non-village secondary without notifications permission');
+              }
+            }
+            
+          } else if (currentUserData?.role === 'village_editor') {
+            // 🚫 VILLAGE EDITOR: No notifications
+            filteredNotifications = [];
+            console.log('🚫 Village editor - no notifications');
+          }
+          
+          console.log('📋 Final filtered notifications:', filteredNotifications.length);
+          
+          const unreadCount = filteredNotifications.filter(notification => 
+            !notification.readBy?.includes(adminEmail)
+          ).length;
+          
+          console.log('🔢 Unread count for', adminEmail, ':', unreadCount);
+          
+          // ✅ ENSURE callback is called properly
+          if (typeof callback === 'function') {
+            callback(filteredNotifications, unreadCount);
+          } else {
+            console.error('❌ Callback is not a function:', typeof callback);
+          }
+          
+        } catch (error) {
+          console.error('❌ Error in notifications processing:', error);
+          // Call callback with empty data on error
+          if (typeof callback === 'function') {
+            callback([], 0);
+          }
+        }
       },
       (error) => {
         console.error('❌ Error in notifications subscription:', error);
-        // Retry the subscription after a short delay
         setTimeout(() => {
           console.log('🔄 Retrying notifications subscription...');
-          notificationsService.subscribeToNotifications(adminEmail, callback);
+          this.subscribeToNotifications(adminEmail, currentUserData, callback); // ✅ FIX: Use 'this' instead of 'notificationsService'
         }, 2000);
       }
     );
@@ -257,6 +320,77 @@ export const notificationsService = {
       
     } catch (error) {
       console.error('❌ Failed to create test notification:', error);
+    }
+  },
+
+  // Get notifications for village admin (only from their village editors)
+  async getNotificationsForVillageAdmin(villageId: string, userEmail: string): Promise<Notification[]> {
+    try {
+      // Get all village editors for this village
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('assignedVillageId', '==', villageId),
+        where('role', '==', 'village_editor')
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      const villageEditorEmails = usersSnapshot.docs.map(doc => doc.data().email);
+      
+      // Get notifications from these editors
+      const notificationsQuery = query(
+        collection(db, COLLECTION_NAME),
+        where('performedBy', 'in', villageEditorEmails),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
+      
+      const querySnapshot = await getDocs(notificationsQuery);
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate(),
+      } as Notification));
+    } catch (error) {
+      console.error('Error fetching village admin notifications:', error);
+      throw error;
+    }
+  },
+
+  // Get users from the same village (village_editors + other secondaries)
+  async getUsersFromSameVillage(villageId: string): Promise<any[]> {
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('assignedVillageId', '==', villageId)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      return usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error getting same village users:', error);
+      return [];
+    }
+  },
+
+  // Get user by email
+  async getUserByEmail(email: string): Promise<any | null> {
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('email', '==', email)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      if (!usersSnapshot.empty) {
+        return {
+          id: usersSnapshot.docs[0].id,
+          ...usersSnapshot.docs[0].data()
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return null;
     }
   }
 }; 

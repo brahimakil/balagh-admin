@@ -20,8 +20,15 @@ const Settings: React.FC = () => {
     descriptionEn: '',
     descriptionAr: '',
     mainImage: '',
-    colorOverlay: '#000000'
+    colorOverlay: '#000000',
+    showOverlay: true // ✅ NEW
   });
+
+  // Add news ticker color state
+  const [newsTickerColor, setNewsTickerColor] = useState('#ff0000');
+  const [newsTickerTextColor, setNewsTickerTextColor] = useState('#ffffff'); // ✅ NEW
+  const [newsTickerFontSize, setNewsTickerFontSize] = useState(16); // ✅ NEW
+  const [newsTickerHeight, setNewsTickerHeight] = useState(40); // ✅ NEW
 
   const [imagePreview, setImagePreview] = useState<string>('');
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -48,6 +55,10 @@ const Settings: React.FC = () => {
   const [lightLogoPreview, setLightLogoPreview] = useState<string>('');
   const [uploadingLogos, setUploadingLogos] = useState(false);
 
+  // Add these state variables:
+  const [headerMenuColor, setHeaderMenuColor] = useState('#333333');
+  const [headerMenuHoverColor, setHeaderMenuHoverColor] = useState('#007bff');
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -57,6 +68,12 @@ const Settings: React.FC = () => {
       setLoading(true);
       const settingsData = await websiteSettingsService.getWebsiteSettings();
       setSettings(settingsData);
+      setNewsTickerColor(settingsData.newsTickerColor || '#ff0000');
+      setNewsTickerTextColor(settingsData.newsTickerTextColor || '#ffffff'); // ✅ NEW
+      setNewsTickerFontSize(settingsData.newsTickerFontSize || 16); // ✅ NEW
+      setNewsTickerHeight(settingsData.newsTickerHeight || 40); // ✅ NEW
+      setHeaderMenuColor(settingsData.headerMenuColor || '#333333');
+      setHeaderMenuHoverColor(settingsData.headerMenuHoverColor || '#007bff');
     } catch (error) {
       console.error('Error loading settings:', error);
       setError('Failed to load website settings');
@@ -66,7 +83,11 @@ const Settings: React.FC = () => {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'showOverlay') {
+      setFormData(prev => ({ ...prev, [field]: value === 'true' }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleTranslate = async (sourceField: string, direction: 'toAr' | 'toEn') => {
@@ -165,6 +186,67 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleNewsTickerColorChange = async (color: string) => {
+    try {
+      setLoading(true);
+      await websiteSettingsService.updateNewsTickerColor(
+        color,
+        currentUser?.email!,
+        currentUserData?.fullName
+      );
+      setNewsTickerColor(color);
+      setSuccess('News ticker color updated successfully');
+      await loadSettings();
+    } catch (error) {
+      console.error('Error updating news ticker color:', error);
+      setError('Failed to update news ticker color');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewsTickerSettingsChange = async () => {
+    try {
+      setLoading(true);
+      await websiteSettingsService.updateNewsTickerSettings(
+        {
+          backgroundColor: newsTickerColor,
+          textColor: newsTickerTextColor,
+          fontSize: newsTickerFontSize,
+          height: newsTickerHeight
+        },
+        currentUser?.email!,
+        currentUserData?.fullName
+      );
+      setSuccess('News ticker settings updated successfully');
+      await loadSettings();
+    } catch (error) {
+      console.error('Error updating news ticker settings:', error);
+      setError('Failed to update news ticker settings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleHeaderColorsUpdate = async () => {
+    try {
+      setLoading(true);
+      await websiteSettingsService.updateHeaderColors(
+        headerMenuColor,
+        headerMenuHoverColor,
+        currentUser?.email!,
+        currentUserData?.fullName
+      );
+      setSuccess('Header colors updated successfully');
+      await loadSettings();
+    } catch (error) {
+      console.error('Error updating header colors:', error);
+      setError('Failed to update header colors');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       titleEn: '',
@@ -172,7 +254,8 @@ const Settings: React.FC = () => {
       descriptionEn: '',
       descriptionAr: '',
       mainImage: '',
-      colorOverlay: '#000000'
+      colorOverlay: '#000000',
+      showOverlay: true // ✅ NEW
     });
     setImagePreview('');
     setSelectedImageFile(null);
@@ -197,7 +280,8 @@ const Settings: React.FC = () => {
       descriptionEn: pageSettings.descriptionEn,
       descriptionAr: pageSettings.descriptionAr,
       mainImage: pageSettings.mainImage,
-      colorOverlay: pageSettings.colorOverlay
+      colorOverlay: pageSettings.colorOverlay,
+      showOverlay: pageSettings.showOverlay ?? true // ✅ NEW
     });
     setImagePreview(pageSettings.mainImage);
     setSelectedImageFile(null);
@@ -356,6 +440,203 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* ✅ UPDATED: Complete News Ticker Settings */}
+      <div className="settings-section">
+        <div className="section-header">
+          <h3>🎨 News Ticker Settings</h3>
+          <p>Configure the appearance of the news ticker on the website</p>
+        </div>
+        
+        <div className="ticker-settings">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Background Color</label>
+              <div className="color-input-group">
+                <input
+                  type="color"
+                  value={newsTickerColor}
+                  onChange={(e) => setNewsTickerColor(e.target.value)}
+                  className="color-picker"
+                />
+                <input
+                  type="text"
+                  value={newsTickerColor}
+                  onChange={(e) => setNewsTickerColor(e.target.value)}
+                  placeholder="#ff0000"
+                  className="color-text-input"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Text Color</label>
+              <div className="color-input-group">
+                <input
+                  type="color"
+                  value={newsTickerTextColor}
+                  onChange={(e) => setNewsTickerTextColor(e.target.value)}
+                  className="color-picker"
+                />
+                <input
+                  type="text"
+                  value={newsTickerTextColor}
+                  onChange={(e) => setNewsTickerTextColor(e.target.value)}
+                  placeholder="#ffffff"
+                  className="color-text-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Font Size (px)</label>
+              <input
+                type="number"
+                value={newsTickerFontSize}
+                onChange={(e) => setNewsTickerFontSize(parseInt(e.target.value) || 16)}
+                min="10"
+                max="32"
+                className="number-input"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Height (px)</label>
+              <input
+                type="number"
+                value={newsTickerHeight}
+                onChange={(e) => setNewsTickerHeight(parseInt(e.target.value) || 40)}
+                min="20"
+                max="100"
+                className="number-input"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <div 
+              className="ticker-preview" 
+              style={{ 
+                backgroundColor: newsTickerColor,
+                color: newsTickerTextColor,
+                fontSize: `${newsTickerFontSize}px`,
+                height: `${newsTickerHeight}px`,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 20px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              🔴 LIVE: Breaking news will appear like this on the website...
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button 
+              className="submit-btn"
+              onClick={handleNewsTickerSettingsChange}
+              disabled={loading}
+            >
+              Update News Ticker Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ NEW: Header Menu Colors */}
+      <div className="settings-section">
+        <div className="section-header">
+          <h3>🔗 Header Menu Colors</h3>
+          <p>Configure header menu link colors (الوان القائمة)</p>
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>Menu Color</label>
+            <div className="color-input-group">
+              <input
+                type="color"
+                value={headerMenuColor}
+                onChange={(e) => setHeaderMenuColor(e.target.value)}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={headerMenuColor}
+                onChange={(e) => setHeaderMenuColor(e.target.value)}
+                placeholder="#333333"
+                className="color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Hover Color</label>
+            <div className="color-input-group">
+              <input
+                type="color"
+                value={headerMenuHoverColor}
+                onChange={(e) => setHeaderMenuHoverColor(e.target.value)}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={headerMenuHoverColor}
+                onChange={(e) => setHeaderMenuHoverColor(e.target.value)}
+                placeholder="#007bff"
+                className="color-text-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Preview</label>
+          <div style={{ 
+            padding: '15px', 
+            backgroundColor: '#f8f9fa', 
+            border: '1px solid #ddd', 
+            borderRadius: '4px' 
+          }}>
+            <span 
+              style={{ 
+                color: headerMenuColor, 
+                marginRight: '20px',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => e.target.style.color = headerMenuHoverColor}
+              onMouseLeave={(e) => e.target.style.color = headerMenuColor}
+            >
+              Sample Link
+            </span>
+            <span 
+              style={{ 
+                color: headerMenuColor,
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => e.target.style.color = headerMenuHoverColor}
+              onMouseLeave={(e) => e.target.style.color = headerMenuColor}
+            >
+              Another Link
+            </span>
+          </div>
+        </div>
+
+        <div className="form-actions">
+          <button 
+            className="submit-btn"
+            onClick={handleHeaderColorsUpdate}
+            disabled={loading}
+          >
+            Update Header Colors
+          </button>
+        </div>
+      </div>
+
       {/* Pages Grid */}
       <div className="settings-grid">
         {settings && Object.entries(settings.pages).map(([pageId, pageSettings]) => (
@@ -364,10 +645,12 @@ const Settings: React.FC = () => {
               {pageSettings.mainImage ? (
                 <div className="page-image-wrapper">
                   <img src={pageSettings.mainImage} alt={pageSettings.titleEn} className="page-image" />
-                  <div 
-                    className="color-overlay" 
-                    style={{ backgroundColor: pageSettings.colorOverlay, opacity: 0.6 }}
-                  ></div>
+                  {pageSettings.showOverlay && (
+                    <div 
+                      className="color-overlay" 
+                      style={{ backgroundColor: pageSettings.colorOverlay, opacity: 0.6 }}
+                    ></div>
+                  )}
                 </div>
               ) : (
                 <div className="page-placeholder">
@@ -393,9 +676,12 @@ const Settings: React.FC = () => {
               </div>
               
               <div className="page-color">
-                <strong>Color Overlay:</strong>
+                <strong>Overlay:</strong>
                 <div className="color-preview" style={{ backgroundColor: pageSettings.colorOverlay }}></div>
                 <span>{pageSettings.colorOverlay}</span>
+                <span style={{ marginLeft: '10px', fontSize: '12px', color: pageSettings.showOverlay ? 'green' : 'red' }}>
+                  {pageSettings.showOverlay ? '(ON)' : '(OFF)'}
+                </span>
               </div>
               
               <div className="page-card-actions">
@@ -436,37 +722,57 @@ const Settings: React.FC = () => {
                       <div className="image-preview-container">
                         <div className="image-preview-wrapper">
                           <img src={imagePreview} alt="Preview" className="image-preview" />
-                          <div 
-                            className="preview-color-overlay" 
-                            style={{ backgroundColor: formData.colorOverlay, opacity: 0.6 }}
-                          ></div>
+                          {formData.showOverlay && (
+                            <div 
+                              className="preview-color-overlay" 
+                              style={{ backgroundColor: formData.colorOverlay, opacity: 0.6 }}
+                            ></div>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Color Overlay */}
+                {/* Show Overlay Toggle */}
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Color Overlay *</label>
-                    <div className="color-input-wrapper">
+                    <label>Show Color Overlay</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <input
-                        type="color"
-                        value={formData.colorOverlay}
-                        onChange={(e) => handleInputChange('colorOverlay', e.target.value)}
-                        className="color-input"
+                        type="checkbox"
+                        checked={formData.showOverlay}
+                        onChange={(e) => handleInputChange('showOverlay', e.target.checked.toString())}
+                        style={{ transform: 'scale(1.2)' }}
                       />
-                      <input
-                        type="text"
-                        value={formData.colorOverlay}
-                        onChange={(e) => handleInputChange('colorOverlay', e.target.value)}
-                        placeholder="#000000"
-                        className="color-text-input"
-                      />
+                      <span>{formData.showOverlay ? 'Overlay Enabled' : 'Overlay Disabled'}</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Color Overlay - only show if overlay is enabled */}
+                {formData.showOverlay && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Color Overlay *</label>
+                      <div className="color-input-wrapper">
+                        <input
+                          type="color"
+                          value={formData.colorOverlay}
+                          onChange={(e) => handleInputChange('colorOverlay', e.target.value)}
+                          className="color-input"
+                        />
+                        <input
+                          type="text"
+                          value={formData.colorOverlay}
+                          onChange={(e) => handleInputChange('colorOverlay', e.target.value)}
+                          placeholder="#000000"
+                          className="color-text-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Titles */}
                 <div className="form-row">

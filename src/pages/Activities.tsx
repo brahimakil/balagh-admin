@@ -4,8 +4,12 @@ import { activityTypesService, type ActivityType } from '../services/activityTyp
 import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
 import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
+import { villagesService, type Village } from '../services/villagesService';
 
 const Activities: React.FC = () => {
+  // ✅ ADD: Destructure currentUser and currentUserData
+  const { currentUser, currentUserData } = useAuth();
+  
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,10 +19,12 @@ const Activities: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [villages, setVillages] = useState<Village[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
     activityTypeId: '',
+    villageId: '', // ✅ NEW: Optional village
     nameEn: '',
     nameAr: '',
     descriptionEn: '',
@@ -42,7 +48,10 @@ const Activities: React.FC = () => {
   // Add a separate state for file deletion loading (add this with other state variables):
   const [deletingFile, setDeletingFile] = useState<string | null>(null); // stores the URL of file being deleted
 
-  const { canAccessActivityType, currentUser, currentUserData } = useAuth();
+  // Determine user capabilities
+  const canApprove = currentUserData?.role === 'main' || currentUserData?.role === 'secondary';
+  const needsApproval = currentUserData?.role === 'village_editor';
+  const villageId = currentUserData?.assignedVillageId;
 
   useEffect(() => {
     loadData();
@@ -56,30 +65,55 @@ const Activities: React.FC = () => {
 
   // Update the loadData function to filter activities based on permissions
 
+  // ✅ FIX: Replace the old activity type filtering with village-based permissions
   const loadData = async () => {
     try {
       setLoading(true);
-      const [activitiesData, activityTypesData] = await Promise.all([
+      
+      const [activitiesData, activityTypesData, villagesData] = await Promise.all([
         activitiesService.getAllActivities(),
-        activityTypesService.getAllActivityTypes()
+        activityTypesService.getAllActivityTypes(),
+        villagesService.getAllVillages()
       ]);
       
-      // Filter activity types based on current admin permissions
-      const allowedActivityTypes = activityTypesData.filter(type => 
-        canAccessActivityType(type.id!)
-      );
+      // Filter activities based on role and village assignment
+      let filteredActivities = activitiesData; // ✅ DECLARE THE VARIABLE WITH DEFAULT
+
+      if (currentUserData?.role === 'village_editor') {
+        // Village editor: only their assigned village
+        const assignedVillageId = currentUserData?.assignedVillageId;
+        if (assignedVillageId) {
+          filteredActivities = activitiesData.filter(activity => 
+            activity.villageId === assignedVillageId
+          );
+        } else {
+          // No village assigned, show no activities
+          filteredActivities = [];
+        }
+      } else if (currentUserData?.role === 'secondary') {
+        // Secondary admin: depends on village assignment
+        const assignedVillageId = currentUserData?.assignedVillageId;
+        if (assignedVillageId) {
+          // Village-assigned secondary: only their village activities
+          filteredActivities = activitiesData.filter(activity => 
+            activity.villageId === assignedVillageId
+          );
+        } else {
+          // Non-village secondary: see all activities (based on permissions)
+          filteredActivities = activitiesData;
+        }
+      }
+      // ✅ Main admin sees everything (filteredActivities = activitiesData by default)
       
-      // Filter activities based on allowed activity types
-      const allowedActivityTypeIds = allowedActivityTypes.map(type => type.id!);
-      const filteredActivities = activitiesData.filter(activity =>
-        allowedActivityTypeIds.includes(activity.activityTypeId)
-      ).map(activity => ({
+      // Add activity type names
+      const activitiesWithTypeNames = filteredActivities.map(activity => ({
         ...activity,
-        activityTypeName: allowedActivityTypes.find(type => type.id === activity.activityTypeId)?.nameEn
+        activityTypeName: activityTypesData.find(type => type.id === activity.activityTypeId)?.nameEn
       }));
       
-      setActivities(filteredActivities);
-      setActivityTypes(allowedActivityTypes);
+      setActivities(activitiesWithTypeNames);
+      setActivityTypes(activityTypesData); // All activity types available
+      setVillages(villagesData);
       
       // Update activity statuses
       await activitiesService.updateActivityStatuses();
@@ -91,107 +125,120 @@ const Activities: React.FC = () => {
     }
   };
 
-  // Fix the handleSubmit function to NOT re-upload existing files:
+  // ✅ ADD: Add this handleEdit function right after the loadData function (around line 115-120)
+  const handleEdit = (activity: Activity) => {
+    console.log('🔄 EDIT CLICKED - Activity:', activity.nameEn);
+    console.log('👤 Current user role:', currentUserData?.role);
+    console.log('🔒 Original isPrivate:', activity.isPrivate);
+    
+    setEditingActivity(activity);
+    
+    // FORCE private for village_admin
+    const forcePrivate = currentUserData?.role === 'village_editor';
+    console.log('🔒 FORCING PRIVATE:', forcePrivate);
+    
+    setFormData({
+      activityTypeId: activity.activityTypeId,
+      villageId: activity.villageId || '',
+      nameEn: activity.nameEn,
+      nameAr: activity.nameAr,
+      descriptionEn: activity.descriptionEn,
+      descriptionAr: activity.descriptionAr,
+      isPrivate: forcePrivate ? true : activity.isPrivate, // ✅ FORCE TRUE for village_admin
+      isActive: activity.isActive,
+      isManuallyReactivated: activity.isManuallyReactivated || false,
+      date: activity.date.toISOString().split('T')[0],
+      time: activity.time,
+      durationHours: activity.durationHours || 24,
+      mainImage: activity.mainImage || '',
+    });
+    
+    if (activity.mainImage) {
+      setImagePreview(activity.mainImage);
+    }
+    
+    setShowForm(true);
+    
+    console.log('✅ Form data set - isPrivate:', forcePrivate ? true : activity.isPrivate);
+  };
+
+  // ✅ ADD: Add this handleSubmit function (around line 150-200, after handleEdit)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!formData.activityTypeId || !formData.nameEn || !formData.nameAr || 
-        !formData.descriptionEn || !formData.descriptionAr || !formData.date || 
-        !formData.time || !formData.mainImage || !formData.durationHours) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    if (formData.durationHours < 1) {
-      setError('Duration must be at least 1 hour');
-      return;
-    }
-
+    console.log('🚀 FORM SUBMITTED');
+    console.log('📋 Form data isPrivate:', formData.isPrivate);
+    console.log('🔄 editingActivity:', editingActivity?.id);
+    
     try {
       setLoading(true);
-      setUploading(true);
+      setError('');
       
-      const now = new Date();
-      const activityDateTime = new Date(formData.date + 'T' + formData.time);
-      const activityEndTime = new Date(activityDateTime);
-      activityEndTime.setHours(activityEndTime.getHours() + Number(formData.durationHours));
-      
-      let finalIsActive = formData.isActive;
-      let finalIsManuallyReactivated = false;
-      
-      if (formData.isActive) {
-        // Force Active is checked - override timing, always active
-        finalIsActive = true;
-        finalIsManuallyReactivated = true;
-      } else {
-        // Force Active is unchecked - follow auto timing
-        finalIsActive = now >= activityDateTime && now < activityEndTime;
-        finalIsManuallyReactivated = false;
-      }
-      
-      // DON'T include photos and videos in the update data
       const activityData = {
         activityTypeId: formData.activityTypeId,
+        villageId: formData.villageId || undefined,
         nameEn: formData.nameEn,
         nameAr: formData.nameAr,
         descriptionEn: formData.descriptionEn,
         descriptionAr: formData.descriptionAr,
-        isPrivate: formData.isPrivate,
+        isPrivate: formData.isPrivate, // ✅ CRITICAL: Include isPrivate
+        isActive: calculateInitialActiveState(formData), // ✅ CALCULATE proper initial state
+        isManuallyReactivated: formData.isManuallyReactivated,
+        date: new Date(formData.date + 'T' + formData.time),
         time: formData.time,
-        mainImage: formData.mainImage,
-        date: new Date(formData.date),
-        durationHours: Number(formData.durationHours),
-        isActive: finalIsActive,
-        isManuallyReactivated: finalIsManuallyReactivated,
-        // DON'T INCLUDE photos: formData.photos - this has the old deleted files!
-        // DON'T INCLUDE videos: formData.videos - this has the old deleted files!
+        durationHours: formData.durationHours,
       };
-
+      
+      console.log('💾 Saving activityData:', activityData);
+      console.log('🔒 Saving isPrivate as:', activityData.isPrivate);
+      
       if (editingActivity) {
+        // ✅ UPDATE existing activity
+        console.log('📝 UPDATING activity:', editingActivity.id);
         await activitiesService.updateActivity(
-          editingActivity.id!, 
-          activityData, // This no longer has photos/videos arrays
-          currentUser?.email, 
+          editingActivity.id!,
+          activityData,
+          currentUser?.email,
           currentUserData?.fullName,
-          selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined,
-          selectedMainImageFile || undefined
+          selectedPhotos, // ✅ ADD: new photos
+          selectedVideos, // ✅ ADD: new videos  
+          selectedMainImageFile || undefined // ✅ ADD: main image file
         );
         setSuccess('Activity updated successfully');
       } else {
-        // For new activities, we DO want empty arrays
+        // ✅ ADD new activity
+        console.log('➕ ADDING new activity');
         await activitiesService.addActivity(
-          { ...activityData, photos: [], videos: [] } as Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>, 
-          currentUser?.email!, 
-          currentUserData?.fullName,
-          selectedPhotos.length > 0 ? selectedPhotos : undefined,
-          selectedVideos.length > 0 ? selectedVideos : undefined,
-          selectedMainImageFile || undefined
+          activityData,
+          currentUser?.email,
+          currentUserData?.fullName
         );
         setSuccess('Activity added successfully');
+        // ✅ ADD: Immediately update activity statuses after creating
+        await activitiesService.updateActivityStatuses();
       }
       
+      // Refresh data and close form
+      await loadData();
       resetForm();
-      await loadData(); // Make sure this waits for the data to load
+      
     } catch (error) {
-      console.error('Error saving activity:', error);
+      console.error('❌ Error saving activity:', error);
       setError('Failed to save activity');
     } finally {
       setLoading(false);
-      setUploading(false);
     }
   };
 
+  // ✅ UPDATE: The resetForm function to auto-assign village for village_editor
   const resetForm = () => {
     setFormData({
       activityTypeId: '',
+      villageId: currentUserData?.role === 'village_editor' ? (currentUserData?.assignedVillageId || '') : '', // ✅ Auto-assign
       nameEn: '',
       nameAr: '',
       descriptionEn: '',
       descriptionAr: '',
-      isPrivate: false,
+      isPrivate: currentUserData?.role === 'village_editor', // ✅ AUTO-SET to true for village_editor
       isActive: false, // Reset to default
       isManuallyReactivated: false, // Reset to default
       date: new Date().toISOString().split('T')[0],
@@ -200,55 +247,18 @@ const Activities: React.FC = () => {
       mainImage: '',
     });
     setImagePreview('');
-    setEditingActivity(null);
+    setEditingActivity(null); // ✅ CRITICAL: Clear editing state
     setShowForm(false);
     setError('');
     setSuccess('');
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setSelectedMainImageFile(null);
+    console.log('🔄 Form reset, editingActivity cleared');
   };
 
-  const handleEdit = async (activity: Activity) => {
-    try {
-      // Fetch the latest activity data to ensure we have updated photos/videos
-      const latestActivity = await activitiesService.getActivity(activity.id!);
-      const activityToEdit = latestActivity || activity;
-      
-      setFormData({
-        ...activityToEdit,
-        date: activityToEdit.date.toISOString().split('T')[0],
-        durationHours: activityToEdit.durationHours || 24,
-        isManuallyReactivated: activityToEdit.isManuallyReactivated || false,
-        isActive: activityToEdit.isManuallyReactivated || false // Only show Force Active as checked if it's manually reactivated
-      });
-      setImagePreview(activityToEdit.mainImage);
-      
-      // Clear any previously selected files
-      setSelectedPhotos([]);
-      setSelectedVideos([]);
-      setSelectedMainImageFile(null);
-      
-      setEditingActivity(activityToEdit);
-      setShowForm(true);
-    } catch (error) {
-      console.error('Error fetching latest activity data:', error);
-      // Fallback to using the passed activity data
-      setFormData({
-        ...activity,
-        date: activity.date.toISOString().split('T')[0],
-        durationHours: activity.durationHours || 24,
-        isManuallyReactivated: activity.isManuallyReactivated || false,
-        isActive: activity.isManuallyReactivated || false // Only show Force Active as checked if it's manually reactivated
-      });
-      setImagePreview(activity.mainImage);
-      setSelectedPhotos([]);
-      setSelectedVideos([]);
-      setSelectedMainImageFile(null);
-      setEditingActivity(activity);
-      setShowForm(true);
-    }
-  };
+  // ✅ FIX: Update the handleEdit function to auto-set isPrivate=true for village_admin
+  // This function is now handled by the new handleEdit function.
 
   const handleDelete = async (id: string, activityName: string) => {
     if (!currentUser?.email) {
@@ -538,6 +548,54 @@ const Activities: React.FC = () => {
     }
   };
 
+  // Add this helper function to get village name:
+  const getVillageName = (villageId?: string): string => {
+    if (!villageId) return '';
+    const village = villages.find(v => v.id === villageId);
+    return village ? `🏘️ ${village.nameEn}` : '';
+  };
+
+  // ✅ ADD this helper function before handleSubmit:
+  const calculateInitialActiveState = (formData: any): boolean => {
+    const now = new Date();
+    const activityDateTime = new Date(formData.date + 'T' + formData.time);
+    const activityEndTime = new Date(activityDateTime);
+    activityEndTime.setHours(activityEndTime.getHours() + formData.durationHours);
+    
+    // If current time is within the activity window, set as active
+    const shouldBeActive = now >= activityDateTime && now < activityEndTime;
+    console.log('🔄 Calculating initial active state:', {
+      now,
+      activityStart: activityDateTime,
+      activityEnd: activityEndTime,
+      shouldBeActive
+    });
+    
+    return shouldBeActive;
+  };
+
+  // Add this helper function to determine activity status for the form:
+  const getActivityStatusForForm = (activity: any) => {
+    const now = new Date();
+    const activityDateTime = new Date(activity.date);
+    const [hours, minutes] = activity.time.split(':');
+    activityDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    const activityEndTime = new Date(activityDateTime);
+    activityEndTime.setHours(activityEndTime.getHours() + (activity.durationHours || 24));
+    
+    const isInTimeWindow = now >= activityDateTime && now < activityEndTime;
+    
+    if (activity.isManuallyReactivated) {
+      return 'manual-permanent';
+    } else if (activity.isActive && isInTimeWindow) {
+      return 'auto-active';
+    } else if (activity.isActive && !isInTimeWindow) {
+      return 'force-active';
+    } else {
+      return 'inactive';
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-container">
@@ -750,6 +808,35 @@ const Activities: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                {/* ✅ NEW: Optional Village Dropdown */}
+                <div className="form-group">
+                  <label>Village</label>
+                  <select
+                    value={formData.villageId}
+                    onChange={(e) => handleInputChange('villageId', e.target.value)}
+                    disabled={currentUserData?.role === 'village_editor'} // ✅ Disable for village_editor
+                    required={currentUserData?.role !== 'main'} // Required for non-main admins
+                  >
+                    <option value="">Select Village</option>
+                    {villages
+                      .filter(village => {
+                        // ✅ Show only assigned village for village_editor and village-assigned secondary
+                        if (currentUserData?.role === 'village_editor') {
+                          return village.id === currentUserData?.assignedVillageId;
+                        } else if (currentUserData?.role === 'secondary' && currentUserData?.assignedVillageId) {
+                          return village.id === currentUserData?.assignedVillageId;
+                        }
+                        // Main admin and non-village secondary see all villages
+                        return true;
+                      })
+                      .map(village => (
+                        <option key={village.id} value={village.id}>
+                          {village.nameEn} - {village.nameAr}
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
 
               <div className="form-row">
@@ -841,8 +928,16 @@ const Activities: React.FC = () => {
                       type="checkbox"
                       checked={formData.isPrivate}
                       onChange={(e) => handleInputChange('isPrivate', e.target.checked)}
+                      disabled={currentUserData?.role === 'village_editor' || currentUserData?.role === 'village_admin'}
                     />
-                    Private Activity
+                    🔒 Private Activity
+                    {(currentUserData?.role === 'village_editor' || currentUserData?.role === 'village_admin') && (
+                      <small style={{ color: 'var(--text-secondary)', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                        {currentUserData?.role === 'village_editor' 
+                          ? 'Village editor activities are private by default.' 
+                          : 'Village admin edits automatically set activities to private.'}
+                      </small>
+                    )}
                   </label>
                 </div>
                 
@@ -850,16 +945,28 @@ const Activities: React.FC = () => {
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={formData.isActive}
-                      onChange={(e) => handleInputChange('isActive', e.target.checked)}
+                      checked={formData.isManuallyReactivated}
+                      onChange={(e) => {
+                        handleInputChange('isManuallyReactivated', e.target.checked);
+                        if (e.target.checked) {
+                          handleInputChange('isActive', true);
+                        }
+                      }}
                     />
-                    Force Active Now
+                    ⚡ Force Permanent Active (Manual Override)
                   </label>
-                  <small style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '4px' }}>
-                    If checked: Override timing and make active immediately. If unchecked: Follow auto-timing schedule.
-                  </small>
                   
-              
+                  {editingActivity && (
+                    <div style={{ marginTop: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '4px' }}>
+                      <strong>Current Status:</strong> {(() => {
+                        const status = getActivityStatusForForm(editingActivity);
+                        if (status === 'auto-active') return '🟢 Auto-Active (within schedule)';
+                        if (status === 'manual-permanent') return '🟣 Manual Permanent Active';
+                        if (status === 'force-active') return '🔴 Force Active (outside schedule)';
+                        return '⭕ Inactive';
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
 
