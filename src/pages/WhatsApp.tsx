@@ -85,7 +85,7 @@ const WhatsApp: React.FC = () => {
   const [sendCooldown, setSendCooldown] = useState(0);
   
   const { currentUser, hasPermission } = useAuth();
-  const BACKEND_URL = 'http://localhost:3001';
+  const BACKEND_URL = 'https://balaghwhatsapp-production.up.railway.app';
 
   useEffect(() => {
     if (!hasPermission('whatsapp')) {
@@ -478,7 +478,7 @@ const WhatsApp: React.FC = () => {
         if (location.photos && Array.isArray(location.photos)) {
           location.photos.forEach((photo, i) => {
             if (photo.url) {
-              mediaUrls.push(`�� Photo ${i + 1}: ${photo.url}`);
+              mediaUrls.push(`📷 Photo ${i + 1}: ${photo.url}`);
             }
           });
         }

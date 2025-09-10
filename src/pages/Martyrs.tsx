@@ -95,7 +95,7 @@ const Martyrs: React.FC = () => {
 
     // Clear any existing errors
     setError('');
-    
+
     try {
       setTranslating(targetField);
       const translatedText = direction === 'toAr' 
@@ -820,7 +820,7 @@ const Martyrs: React.FC = () => {
                 </div>
 
                 {formData.familyStatus === 'married' && (
-                  <div className="form-group">
+                <div className="form-group">
                     <label>Number of Children</label>
                     <input
                       type="number"
