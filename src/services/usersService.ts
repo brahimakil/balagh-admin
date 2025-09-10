@@ -33,6 +33,8 @@ export interface UserPermissions {
   admins: boolean;
   settings: boolean;
   martyrsStories: boolean;
+  importsExports: boolean; // ✅ NEW: Imports/Exports permission
+  whatsapp: boolean; // ✅ NEW: WhatsApp permission
   // ✅ REMOVE: allowedActivityTypes?: string[]; (not needed anymore)
 }
 
@@ -82,12 +84,41 @@ export const usersService = {
       }
       
       const doc = querySnapshot.docs[0];
-      return {
+      const userData = {
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate() || new Date(),
       } as User;
+
+      // ✅ FIX: Only ensure essential permissions are set, don't override manual selections
+      if (userData.role === 'secondary' && !userData.assignedVillageId) {
+        const currentPermissions = userData.permissions || {};
+        
+        // Only update if essential permissions are missing (don't override manual selections)
+        const needsEssentialUpdate = 
+          currentPermissions.dashboard !== true || 
+          currentPermissions.notifications !== true;
+        
+        if (needsEssentialUpdate) {
+          console.log('🔄 Adding essential permissions for secondary admin with no village:', email);
+          
+          // Only update the essential permissions, keep existing manual selections
+          const updatedPermissions = {
+            ...currentPermissions, // Keep existing permissions
+            dashboard: true,       // Ensure dashboard is enabled
+            notifications: true,   // Ensure notifications is enabled
+          };
+          
+          await updateDoc(doc.ref, {
+            permissions: updatedPermissions,
+            updatedAt: Timestamp.fromDate(new Date())
+          });
+          userData.permissions = updatedPermissions;
+        }
+      }
+
+      return userData;
     } catch (error) {
       console.error('Error fetching user by email:', error);
       throw error;
@@ -155,6 +186,8 @@ export const usersService = {
             admins: true,
             settings: true,
             martyrsStories: true,
+            importsExports: true,
+            whatsapp: true,
           };
         } else if (role === 'secondary') {
           if (assignedVillageId) {
@@ -174,11 +207,13 @@ export const usersService = {
               admins: false,
               settings: false,
               martyrsStories: false,
+              importsExports: false,
+              whatsapp: false,
             };
           } else {
             // ✅ NEW: Secondary without village - manual permission selection
             return {
-              dashboard: false,
+              dashboard: true,
               martyrs: false,
               wars: false,
               locations: false,
@@ -187,11 +222,13 @@ export const usersService = {
               activityTypes: false,
               news: false,
               liveNews: false,
-              notifications: false,
+              notifications: true, // ✅ CHANGE: Give notifications permission
               legends: false,
               admins: false,
               settings: false,
               martyrsStories: false,
+              importsExports: false,
+              whatsapp: false,
             };
           }
         } else if (role === 'village_editor') {
@@ -211,6 +248,8 @@ export const usersService = {
             admins: false,
             settings: false,
             martyrsStories: false,
+            importsExports: false,
+            whatsapp: false,
           };
         } else {
           // Default: no permissions
@@ -229,6 +268,8 @@ export const usersService = {
             admins: false,
             settings: false,
             martyrsStories: false,
+            importsExports: false,
+            whatsapp: false,
           };
         }
       };
@@ -240,8 +281,12 @@ export const usersService = {
         fullName: fullName || userData.email,
         role: userData.role,
         profilePhoto: profilePhotoUrl,
-        permissions: getDefaultPermissions(userData.role, userData.assignedVillageId), // ✅ ALWAYS use getDefaultPermissions, ignore userData.permissions
-        assignedVillageId: userData.assignedVillageId,
+        // ✅ FIX: Use manual permissions for secondary without village
+        permissions: userData.role === 'secondary' && !userData.assignedVillageId 
+          ? userData.permissions || getDefaultPermissions(userData.role, userData.assignedVillageId)
+          : getDefaultPermissions(userData.role, userData.assignedVillageId),
+        // ✅ FIX: Only add assignedVillageId if it has a value
+        ...(userData.assignedVillageId && { assignedVillageId: userData.assignedVillageId }),
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
       });
@@ -293,6 +338,11 @@ export const usersService = {
       // Only add profilePhoto if it has a valid value
       if (profilePhotoUrl && profilePhotoUrl.trim() !== '') {
         updateData.profilePhoto = profilePhotoUrl;
+      }
+
+      // ✅ FIX: Only add assignedVillageId if it has a value
+      if (userData.assignedVillageId) {
+        updateData.assignedVillageId = userData.assignedVillageId;
       }
 
       await updateDoc(docRef, updateData);

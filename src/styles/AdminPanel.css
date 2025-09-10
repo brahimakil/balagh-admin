@@ -389,6 +389,10 @@ html[dir="rtl"] .search-icon {
   --success-bg: #f0fdf4;
   --success-color: #16a34a;
   --success-border: #bbf7d0;
+  --success-color: #27ae60;
+  --success-hover: #229954;
+  --error-color: #e74c3c;
+  --error-hover: #c0392b;
 }
 
 /* CSS Variables for Dark Theme */
@@ -2756,8 +2760,6 @@ body {
   border-radius: 8px;
   background-color: var(--surface-color);
   color: var(--text-primary);
-  font-size: 14px;
-  transition: all 0.2s ease;
 }
 
 .form-group input:focus,
@@ -5538,7 +5540,7 @@ body {
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   transition: all 0.2s ease;
   height: fit-content;
@@ -6354,4 +6356,1428 @@ body {
 
 .info-box li {
   margin: 3px 0;
+}
+
+/* Add these styles at the end of the file */
+
+/* Imports/Exports Page Styles */
+.export-sections,
+.import-sections {
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.section-header h2 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.section-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.export-card {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.export-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.export-card-header {
+  background: var(--primary-color);
+  color: white;
+  padding: 1rem;
+}
+
+.export-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.export-card-body {
+  padding: 1.5rem;
+}
+
+.export-card-body p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.export-btn {
+  width: 100%;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.export-btn:hover:not(:disabled) {
+  background: var(--success-hover);
+}
+
+.export-btn:disabled {
+  background: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.import-placeholder {
+  background: var(--card-background);
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 3rem;
+  text-align: center;
+}
+
+.placeholder-content h3 {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.placeholder-content p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Dark mode adjustments */
+.dark-mode .export-card {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+.dark-mode .import-placeholder {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+/* Add these styles for the close buttons in success/error messages */
+.success-message button,
+.error-message button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 10px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.success-message button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.error-message button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.success-message button:focus,
+.error-message button:focus {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Ensure the messages have proper flex layout */
+.success-message,
+.error-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.success-message {
+  background-color: var(--success-color);
+  color: white;
+  border: 1px solid var(--success-hover, #27ae60);
+}
+
+.error-message {
+  background-color: var(--error-color);
+  color: white;
+  border: 1px solid var(--error-hover, #c0392b);
+}
+
+/* Dark mode adjustments */
+.dark-mode .success-message button:hover,
+.dark-mode .error-message button:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.dark-mode .success-message button:focus,
+.dark-mode .error-message button:focus {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Add these CSS variables if they don't exist (add to :root section) */
+:root {
+  --success-color: #27ae60;
+  --success-hover: #229954;
+  --error-color: #e74c3c;
+  --error-hover: #c0392b;
+}
+
+/* Alternative: If the messages don't have proper styling, add this */
+.admin-content .success-message,
+.admin-content .error-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  position: relative;
+}
+
+.admin-content .success-message {
+  background-color: #27ae60;
+  color: white;
+  border: 1px solid #229954;
+}
+
+.admin-content .error-message {
+  background-color: #e74c3c;
+  color: white;
+  border: 1px solid #c0392b;
+}
+
+.admin-content .success-message button,
+.admin-content .error-message button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 10px;
+  min-width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.admin-content .success-message button:hover,
+.admin-content .error-message button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.admin-content .success-message button:focus,
+.admin-content .error-message button:focus {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.admin-content .success-message button:active,
+.admin-content .error-message button:active {
+  transform: scale(0.95);
+}
+
+/* Import sections styles */
+.import-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.import-form {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.import-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.import-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.import-select,
+.file-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--input-background, white);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.import-select:focus,
+.file-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.import-btn {
+  width: 100%;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.import-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.import-btn:disabled {
+  background: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.column-requirements {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.column-requirements h3 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.column-requirements p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.columns-list {
+  background: var(--background-secondary, #f8f9fa);
+  border-radius: 5px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.column-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.column-item:last-child {
+  border-bottom: none;
+}
+
+.column-number {
+  color: var(--primary-color);
+  font-weight: 600;
+  min-width: 30px;
+}
+
+.column-name {
+  color: var(--text-primary);
+  font-family: monospace;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.import-notes {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 5px;
+  padding: 1rem;
+}
+
+.import-notes h4 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-size: 14px;
+}
+
+.import-notes ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.import-notes li {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 0.3rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .import-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dark mode adjustments */
+.dark-mode .columns-list {
+  background: var(--background-secondary, #2a2a2a);
+}
+
+.dark-mode .import-notes {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.4);
+}
+
+/* WhatsApp Management Styles */
+.whatsapp-section {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.connect-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.qr-section {
+  text-align: center;
+  padding: 2rem;
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.qr-container {
+  margin: 1rem 0;
+}
+
+.qr-image {
+  max-width: 300px;
+  width: 100%;
+  height: auto;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.sessions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.session-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--background-secondary);
+}
+
+.session-card.connected {
+  border-color: var(--success-color);
+  background: rgba(39, 174, 96, 0.05);
+}
+
+.session-card.disconnected {
+  border-color: var(--error-color);
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.session-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.session-info p {
+  margin: 0.25rem 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.status-connected { color: var(--success-color); }
+.status-disconnected { color: var(--error-color); }
+.status-waiting_for_scan { color: var(--warning-color); }
+.status-auth_failed { color: var(--error-color); }
+
+.students-input,
+.message-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.send-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.group-section {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.group-name-input {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  min-width: 150px;
+}
+
+.create-group-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.disconnect-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 0.5rem;
+}
+
+/* WhatsApp Tabs */
+.whatsapp-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 5px 5px 0 0;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  background: var(--background-secondary);
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.tab-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Add Contact Form */
+.add-contact-form {
+  background: var(--card-background);
+  border: 2px solid var(--primary-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-header h3 {
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.form-header button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.add-contact-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.save-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.cancel-btn {
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* Contacts Controls */
+.contacts-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.search-box {
+  flex: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.selection-info {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.selected-count {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Contacts Actions */
+.contacts-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.select-all-btn,
+.clear-selection-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--card-background);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.select-all-btn:hover {
+  background: var(--success-color);
+  color: white;
+  border-color: var(--success-color);
+}
+
+.clear-selection-btn:hover {
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+/* Contacts Grid */
+.contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.contact-card {
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--card-background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.contact-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.contact-card.selected {
+  border-color: var(--success-color);
+  background: rgba(39, 174, 96, 0.05);
+}
+
+.contact-card.selected::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--success-color);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.contact-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.contact-info .phone {
+  color: var(--primary-color);
+  font-weight: 500;
+  font-family: monospace;
+  margin: 0.25rem 0;
+}
+
+.contact-info .notes {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+  margin: 0.25rem 0;
+}
+
+.contact-info .added-date {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin: 0.5rem 0 0 0;
+}
+
+.contact-actions {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.delete-contact-btn {
+  background: var(--error-color);
+  border: none;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.delete-contact-btn:hover {
+  opacity: 1;
+}
+
+/* No Contacts/Selection States */
+.no-contacts,
+.no-selection {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.go-contacts-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+/* Selected Contacts Preview */
+.selected-contacts-preview {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.selected-contacts-preview h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+}
+
+.recipients-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.recipient-tag {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 15px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.remove-recipient {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.remove-recipient:hover {
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .whatsapp-tabs {
+    flex-direction: column;
+  }
+  
+  .contacts-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .contacts-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .group-section {
+    flex-direction: column;
+    width: 100%;
+  }
+}
+
+/* No Connection Message */
+.no-connection-message {
+  text-align: center;
+  padding: 3rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px dashed rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.no-connection-message h3 {
+  color: var(--warning-color);
+  margin-bottom: 1rem;
+}
+
+.go-connection-btn {
+  background: var(--warning-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.go-connection-btn:hover {
+  background: #e0a800;
+}
+
+/* Groups Section */
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.group-card {
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--card-background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.group-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.group-card.selected {
+  border-color: var(--success-color);
+  background: rgba(39, 174, 96, 0.05);
+}
+
+.group-card.selected::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--success-color);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.group-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.group-info .member-count {
+  color: var(--primary-color);
+  font-weight: 500;
+  margin: 0.25rem 0;
+}
+
+.group-info .group-id {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: monospace;
+  margin: 0.25rem 0;
+  word-break: break-all;
+}
+
+.group-info .created-date {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin: 0.5rem 0 0 0;
+}
+
+.group-selected-indicator {
+  background: var(--success-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+/* No Groups State */
+.no-groups {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.go-groups-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+/* Messaging Sections */
+.messaging-section {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.messaging-section h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+/* Selected Group Preview */
+.selected-group-preview {
+  background: rgba(39, 174, 96, 0.05);
+  border: 1px solid rgba(39, 174, 96, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.selected-group-preview h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+}
+
+.selected-group-preview .group-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.group-name {
+  background: var(--success-color);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-weight: 500;
+}
+
+.group-members {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.remove-group {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.remove-group:hover {
+  opacity: 1;
+  color: var(--error-color);
+}
+
+/* Send Group Button */
+.send-group-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.send-group-btn:hover {
+  background: #27ae60;
+}
+
+.send-group-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* No Connection Message */
+.no-connection-message {
+  text-align: center;
+  padding: 3rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 2px dashed rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.no-connection-message h3 {
+  color: var(--warning-color);
+  margin-bottom: 1rem;
+}
+
+.go-connection-btn {
+  background: var(--warning-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 1rem;
+}
+
+.go-connection-btn:hover {
+  background: #e0a800;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .groups-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .messaging-section {
+    padding: 1rem;
+  }
+  
+  .selected-group-preview .group-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Content Tab Styles */
+.content-type-selector {
+  margin-left: auto;
+}
+
+.content-type-select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--card-background);
+  font-size: 14px;
+  min-width: 150px;
+}
+
+.content-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.content-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1rem;
+}
+
+.content-card {
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--card-background);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.content-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.content-card.selected {
+  border-color: var(--success-color);
+  background: rgba(39, 174, 96, 0.05);
+}
+
+.content-card.selected::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--success-color);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.content-info h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.content-name-ar {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0.25rem 0;
+  direction: rtl;
+}
+
+.content-type {
+  display: inline-block;
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  margin: 0.5rem 0;
+}
+
+.content-preview {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+  max-height: 60px;
+  overflow: hidden;
+}
+
+.loading-content {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.no-content {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+/* Selected Content Preview */
+.selected-content-preview {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.selected-content-preview h4 {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+}
+
+.selected-content-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.content-tag {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 15px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.remove-content {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.remove-content:hover {
+  opacity: 1;
+}
+
+/* Content Send Options */
+.content-send-options {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.send-content-contacts-btn,
+.send-content-group-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.send-content-contacts-btn {
+  background: var(--primary-color);
+  color: white;
+}
+
+.send-content-contacts-btn:hover {
+  background: #2563eb;
+}
+
+.send-content-group-btn {
+  background: var(--success-color);
+  color: white;
+}
+
+.send-content-group-btn:hover {
+  background: #27ae60;
+}
+
+.send-content-contacts-btn:disabled,
+.send-content-group-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Cooldown Indicator */
+.cooldown-indicator {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 5px;
+  padding: 0.5rem 1rem;
+  color: var(--warning-color);
+  font-weight: 500;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .content-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .content-send-options {
+    flex-direction: column;
+  }
+  
+  .content-actions {
+    flex-direction: column;
+  }
 }

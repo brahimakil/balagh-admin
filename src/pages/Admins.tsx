@@ -4,6 +4,20 @@ import { activityTypesService, type ActivityType } from '../services/activityTyp
 import { villagesService, type Village } from '../services/villagesService'; // ✅ ADD THIS
 import { useAuth } from '../context/AuthContext';
 import Villages from '../pages/Villages';
+import * as XLSX from 'xlsx';
+import io from 'socket.io-client';
+
+interface WhatsAppSession {
+  id: string;
+  sessionId: string;
+  adminEmail: string;
+  status: 'waiting_for_scan' | 'connected' | 'disconnected' | 'auth_failed';
+  phoneNumber?: string;
+  clientName?: string;
+  qrCode?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 const Admins: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
@@ -39,6 +53,8 @@ const Admins: React.FC = () => {
       admins: false,
       settings: false,
       martyrsStories: false,
+      importsExports: false, // ✅ ADDED: importsExports permission
+      whatsapp: false, // ✅ ADDED: whatsapp permission
     } as UserPermissions,
     assignedVillageId: '',
   });
@@ -95,6 +111,12 @@ const Admins: React.FC = () => {
 
     if (!editingAdmin && !formData.password.trim()) {
       setError('Password is required for new users');
+      return;
+    }
+
+    // ✅ NEW: Validate village assignment for village_editor
+    if (formData.role === 'village_editor' && !formData.assignedVillageId) {
+      setError('Village Editors must be assigned to a village');
       return;
     }
 
@@ -168,6 +190,8 @@ const Admins: React.FC = () => {
         admins: false,
         settings: false,
         martyrsStories: false, // ✅ ADD THIS
+        importsExports: false, // ✅ ADD THIS
+        whatsapp: false, // ✅ ADD THIS
       },
       assignedVillageId: '', // Reset assignedVillageId
     });
@@ -202,6 +226,8 @@ const Admins: React.FC = () => {
         admins: false,
         settings: false,
         martyrsStories: false, // ✅ ADD THIS
+        importsExports: false, // ✅ ADD THIS
+        whatsapp: false, // ✅ ADD THIS
       },
       assignedVillageId: admin.assignedVillageId || '', // Set assignedVillageId for editing
     });
@@ -260,7 +286,9 @@ const Admins: React.FC = () => {
       legends: 'Legends',
       admins: 'Admins',
       settings: 'Settings',
-      martyrsStories: 'Martyrs Stories' // ✅ ADD THIS
+      martyrsStories: 'Martyrs Stories', // ✅ ADD THIS
+      importsExports: 'Imports/Exports', // ✅ ADD THIS
+      whatsapp: 'WhatsApp Management', // ✅ ADD THIS
     };
 
     return Object.entries(permissions)
@@ -440,23 +468,31 @@ const Admins: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Village assignment - show for both secondary and village_admin */}
-                {(formData.role === 'secondary' || formData.role === 'village_editor') && ( // ✅ ADDED: village_editor
+                {/* Village assignment - show for both secondary and village_editor */}
+                {(formData.role === 'secondary' || formData.role === 'village_editor') && (
                   <div className="form-group">
-                    <label>Assigned Village</label> {/* ✅ REMOVED: * (no longer required) */}
+                    <label>
+                      Assigned Village 
+                      {formData.role === 'village_editor' && <span style={{ color: 'red' }}>*</span>}
+                    </label>
                     <select
                       value={formData.assignedVillageId}
                       onChange={(e) => setFormData(prev => ({ ...prev, assignedVillageId: e.target.value }))}
-                      // ✅ REMOVED: required
+                      required={formData.role === 'village_editor'} // ✅ Required only for village_editor
                     >
-                      <option value="">No Village</option> {/* ✅ CHANGED: from "Select Village" to "No Village" */}
+                      {formData.role === 'secondary' && <option value="">No Village</option>}
                       {villages.map(village => (
                         <option key={village.id} value={village.id}>
                           {village.nameEn} - {village.nameAr}
                         </option>
                       ))}
                     </select>
-                    <small>Leave as "No Village" for manual permission selection</small> {/* ✅ NEW: Help text */}
+                    <small>
+                      {formData.role === 'village_editor' 
+                        ? 'Village Editors must be assigned to a specific village'
+                        : 'Leave as "No Village" for manual permission selection'
+                      }
+                    </small>
                   </div>
                 )}
 
@@ -500,7 +536,9 @@ const Admins: React.FC = () => {
                             legends: 'Legends',
                             admins: 'Admins Management',
                             settings: 'Website Settings',
-                            martyrsStories: 'Martyrs Stories'
+                            martyrsStories: 'Martyrs Stories', // ✅ ADD THIS
+                            importsExports: 'Imports/Exports', // ✅ ADD THIS
+                            whatsapp: 'WhatsApp Management', // ✅ ADD THIS
                           }).map(([key, label]) => (
                             <label key={key} className="permission-checkbox">
                               <input

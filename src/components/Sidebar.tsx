@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationsContext';
+import ImportsExports from '../pages/ImportsExports';
 
 interface SidebarProps {
   activeItem: string;
@@ -39,6 +40,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'martyrs-stories', label: '📖 Martyrs Stories', permission: 'martyrsStories' },
     { id: 'admins', label: '👤 Admins', permission: 'admins' },
     { id: 'settings', label: '⚙️ Website Settings', permission: 'settings' },
+    { id: 'imports-exports', label: '📊 Imports/Exports', permission: 'importsExports' },
+    { id: 'whatsapp', label: '📱 WhatsApp', permission: 'whatsapp' },
   ];
 
   // Filter menu items based on current user's permissions

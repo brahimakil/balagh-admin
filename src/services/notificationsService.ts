@@ -27,6 +27,7 @@ export interface Notification {
   details?: string; // Additional details about what was changed
   readBy: string[]; // Array of admin emails who have read this notification
   villageId?: string; // Link notification to village
+  performerRole?: string; // Role of the user who performed the action
 }
 
 const COLLECTION_NAME = 'notifications';
@@ -164,6 +165,19 @@ export const notificationsService = {
     console.log('👤 User role:', currentUserData?.role);
     console.log('🏘️ Assigned village:', currentUserData?.assignedVillageId);
     
+    // ✅ FIX: Early return if user has no notifications permission
+    if (currentUserData?.role === 'village_editor') {
+      console.log('🚫 Village editor - no notifications');
+      callback([], 0);
+      return () => {}; // Return empty unsubscribe function
+    }
+    
+    if (currentUserData?.role === 'secondary' && !currentUserData?.permissions?.notifications) {
+      console.log('❌ Secondary admin without notifications permission');
+      callback([], 0);
+      return () => {}; // Return empty unsubscribe function
+    }
+    
     // Get base query for all notifications
     const q = query(
       collection(db, COLLECTION_NAME),
@@ -201,25 +215,56 @@ export const notificationsService = {
               // 🏘️ VILLAGE-ASSIGNED SECONDARY: Only same village notifications
               console.log('🏘️ Village-assigned secondary - filtering for village:', assignedVillageId);
               
-              // Get users from the same village (village_editors + other secondaries)
-              const sameVillageUsers = await this.getUsersFromSameVillage(assignedVillageId);
-              const sameVillageEmails = sameVillageUsers.map(user => user.email);
-              
-              filteredNotifications = allNotifications.filter(notification => 
-                sameVillageEmails.includes(notification.performedBy)
-              );
-              console.log('👥 Same village users:', sameVillageEmails);
+              try {
+                // Get users from the same village (village_editors + other secondaries)
+                const sameVillageUsers = await this.getUsersFromSameVillage(assignedVillageId);
+                const sameVillageEmails = sameVillageUsers.map(user => user.email);
+                
+                filteredNotifications = allNotifications.filter(notification => 
+                  sameVillageEmails.includes(notification.performedBy)
+                );
+                console.log('👥 Same village users:', sameVillageEmails);
+              } catch (error) {
+                console.error('❌ Error filtering village notifications:', error);
+                // Fallback: show no notifications instead of crashing
+                filteredNotifications = [];
+              }
               
             } else {
               // 🌍 NON-VILLAGE SECONDARY: Check permissions
               if (currentUserData?.permissions?.notifications) {
                 console.log('🌍 Non-village secondary with notifications permission');
                 
-                // ✅ FIX: Use synchronous filtering to avoid async issues
-                // For now, show all non-main notifications (we'll optimize later)
-                filteredNotifications = allNotifications.filter(notification => 
-                  notification.performedBy !== 'main@admin.com' // Simple filter for now
-                );
+                try {
+                  // ✅ FIX: Get all users to check their roles
+                  const allUsersQuery = query(collection(db, 'users'));
+                  const allUsersSnapshot = await getDocs(allUsersQuery);
+                  
+                  // Create a map of email -> role for quick lookup
+                  const userRoles = new Map();
+                  allUsersSnapshot.docs.forEach(doc => {
+                    const userData = doc.data();
+                    userRoles.set(userData.email, userData.role);
+                  });
+                  
+                  // Filter notifications: only from secondary and village_editor users
+                  filteredNotifications = allNotifications.filter(notification => {
+                    // Get the role of the user who performed the action
+                    const performerRole = userRoles.get(notification.performedBy);
+                    
+                    // Only show notifications from secondary and village_editor users (not main)
+                    // ✅ FIX: Include own notifications
+                    return performerRole === 'secondary' || performerRole === 'village_editor';
+                  });
+                  
+                  console.log('📋 Non-village secondary notifications (role-filtered):', filteredNotifications.length);
+                  
+                } catch (error) {
+                  console.error('❌ Error filtering notifications by roles:', error);
+                  // Fallback: show no notifications on error
+                  filteredNotifications = [];
+                }
+                
               } else {
                 // No notifications permission
                 filteredNotifications = [];
@@ -258,10 +303,10 @@ export const notificationsService = {
       },
       (error) => {
         console.error('❌ Error in notifications subscription:', error);
-        setTimeout(() => {
-          console.log('🔄 Retrying notifications subscription...');
-          this.subscribeToNotifications(adminEmail, currentUserData, callback); // ✅ FIX: Use 'this' instead of 'notificationsService'
-        }, 2000);
+        // ✅ FIX: Don't retry on permission errors, just call callback with empty data
+        if (typeof callback === 'function') {
+          callback([], 0);
+        }
       }
     );
   },
@@ -312,7 +357,8 @@ export const notificationsService = {
         performedBy: adminEmail,
         performedByName: 'Test User',
         timestamp: Timestamp.fromDate(new Date()),
-        readBy: []
+        readBy: [],
+        performerRole: 'main' // Add performerRole for testing
       };
       
       const docRef = await addDoc(collection(db, COLLECTION_NAME), testNotification);
@@ -358,6 +404,12 @@ export const notificationsService = {
   // Get users from the same village (village_editors + other secondaries)
   async getUsersFromSameVillage(villageId: string): Promise<any[]> {
     try {
+      // ✅ FIX: Add better error handling and fallback
+      if (!villageId) {
+        console.warn('⚠️ No villageId provided to getUsersFromSameVillage');
+        return [];
+      }
+      
       const usersQuery = query(
         collection(db, 'users'),
         where('assignedVillageId', '==', villageId)
@@ -365,10 +417,13 @@ export const notificationsService = {
       const usersSnapshot = await getDocs(usersQuery);
       return usersSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        email: doc.data().email, // Only get essential fields
+        role: doc.data().role,
+        assignedVillageId: doc.data().assignedVillageId
       }));
     } catch (error) {
       console.error('Error getting same village users:', error);
+      // ✅ FIX: Return empty array instead of throwing
       return [];
     }
   },

@@ -20,6 +20,8 @@ import Admins from '../pages/Admins';
 import Settings from '../pages/Settings';
 import MartyrsStories from '../pages/MartyrsStories';
 import Villages from '../pages/Villages';
+import ImportsExports from '../pages/ImportsExports';
+import WhatsApp from '../pages/WhatsApp';
 
 
 const AdminLayout: React.FC = () => {
@@ -52,7 +54,9 @@ const AdminLayout: React.FC = () => {
       'notifications': 'Notifications',
       'martyrs-stories': 'Martyrs Stories Management',
       'admins': 'Admins Management',
-      'settings': 'Website Settings'
+      'settings': 'Website Settings',
+      'imports-exports': 'Imports/Exports',
+      'whatsapp': 'WhatsApp Management'
     };
     return titles[item] || 'Admin Panel';
   };
@@ -72,7 +76,8 @@ const AdminLayout: React.FC = () => {
         'live-news': 'liveNews',
         'notifications': 'notifications',
         'admins': 'admins',
-        'settings': 'settings'
+        'settings': 'settings',
+        'whatsapp': 'whatsapp'
       };
       
       const requiredPermission = permissionMap[item];
@@ -151,7 +156,8 @@ const AdminLayout: React.FC = () => {
         'live-news': 'liveNews',
         'notifications': 'notifications',
         'admins': 'admins',
-        'settings': 'settings'
+        'settings': 'settings',
+        'whatsapp': 'whatsapp'
       };
       
       const requiredPermission = permissionMap[currentPath];
@@ -195,6 +201,8 @@ const AdminLayout: React.FC = () => {
             <Route path="admins" element={<Admins />} />
             <Route path="settings" element={<Settings />} />
             <Route path="martyrs-stories" element={<MartyrsStories />} />
+            <Route path="imports-exports" element={<ImportsExports />} />
+            <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="" element={<Dashboard />} />
           </Routes>
         </main>

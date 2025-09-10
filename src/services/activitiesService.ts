@@ -278,15 +278,42 @@ export const activitiesService = {
       
       await updateDoc(docRef, updateData);
       
-      if (currentUserEmail && updates.nameEn) {
-        await notificationsService.createCRUDNotification(
-          'updated',
-          'activities',
-          id,
-          updates.nameEn,
-          currentUserEmail,
-          currentUserName
-        );
+      // Line 281-301: Add debugging to see what's happening
+      if (currentUserEmail) {
+        console.log('🔔 Creating notification for activity update...');
+        console.log('📧 currentUserEmail:', currentUserEmail);
+        console.log('👤 currentUserName:', currentUserName);
+        console.log('🆔 Activity ID:', id);
+        
+        // Get activity name from updates or fetch from existing data
+        let activityName = updates.nameEn;
+        
+        if (!activityName) {
+          console.log('📝 Activity name not in updates, fetching from database...');
+          const currentDocSnap = await getDoc(docRef);
+          if (currentDocSnap.exists()) {
+            activityName = currentDocSnap.data().nameEn || 'Activity';
+            console.log('📝 Retrieved activity name:', activityName);
+          }
+        }
+        
+        console.log('🎯 Creating notification with name:', activityName);
+        
+        try {
+          await notificationsService.createCRUDNotification(
+            'updated',
+            'activities',
+            id,
+            activityName,
+            currentUserEmail,
+            currentUserName
+          );
+          console.log('✅ Notification created successfully!');
+        } catch (error) {
+          console.error('❌ Error creating notification:', error);
+        }
+      } else {
+        console.log('❌ No currentUserEmail provided, skipping notification');
       }
     } catch (error) {
       console.error('Error updating activity:', error);
@@ -428,10 +455,13 @@ export const activitiesService = {
         let shouldBeActive = activity.isActive;
         let updateNeeded = false;
         
+        // Line 431-434: Replace with this logic
         if (activity.isManuallyReactivated) {
-          // If manually reactivated after expiration, keep active until user manually turns it off
-          // No automatic changes
-          return Promise.resolve();
+          // ✅ FIX: Manually reactivated activities should always be active
+          shouldBeActive = true;
+          if (activity.isActive !== true) {
+            updateNeeded = true;
+          }
         } else if (activity.isActive) {
           // If manually activated before expiration, keep active until duration ends
           if (now >= activityEndTime) {
