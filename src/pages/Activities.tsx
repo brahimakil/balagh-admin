@@ -232,7 +232,10 @@ const Activities: React.FC = () => {
         await activitiesService.addActivity(
           activityData,
           currentUser?.email,
-          currentUserData?.fullName
+          currentUserData?.fullName,
+          selectedPhotos, // ✅ ADD: photos
+          selectedVideos, // ✅ ADD: videos  
+          selectedMainImageFile || undefined // ✅ ADD: main image file
         );
         
         // ✅ Enhanced success message for new activities
