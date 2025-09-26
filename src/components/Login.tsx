@@ -7,10 +7,9 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
 interface LoginProps {
-  onSwitchToSignup: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
+const Login: React.FC<LoginProps> = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -147,15 +146,6 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-        
-        <div className="auth-switch">
-          <p>
-            Don't have an account?{' '}
-            <a href="#" onClick={onSwitchToSignup}>
-              Sign up here
-            </a>
-          </p>
-        </div>
       </div>
     </div>
   );

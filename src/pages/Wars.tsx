@@ -318,7 +318,7 @@ const Wars: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="martyr-form">
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>📝 Basic Information</h3>
                 
                 <div className="form-row">
@@ -437,7 +437,7 @@ const Wars: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <div className="form-group">
                   <label>Main Icon</label>
                   <input
@@ -461,7 +461,7 @@ const Wars: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <div className="form-group">
                   <label>Additional Photos</label>
                   <input
@@ -491,7 +491,7 @@ const Wars: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <div className="form-group">
                   <label>Additional Videos</label>
                   <input

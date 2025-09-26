@@ -6,7 +6,6 @@ import { TranslationProvider } from './context/TranslationContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import AdminLayout from './components/AdminLayout';
 import Login from './components/Login';
-import Signup from './components/Signup';
 
 import './styles/AdminPanel.css';
 
@@ -21,7 +20,6 @@ const AppContent: React.FC = () => {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -35,24 +33,9 @@ const AppContent: React.FC = () => {
   );
 };
 
+// ✅ SIMPLIFIED: Just return Login component without signup
 const LoginPage: React.FC = () => {
-  const [authMode, setAuthMode] = React.useState<'login' | 'signup'>('login');
-
-  return authMode === 'login' ? (
-    <Login onSwitchToSignup={() => setAuthMode('signup')} />
-  ) : (
-    <Signup onSwitchToLogin={() => setAuthMode('login')} />
-  );
-};
-
-const SignupPage: React.FC = () => {
-  const [authMode, setAuthMode] = React.useState<'login' | 'signup'>('signup');
-
-  return authMode === 'signup' ? (
-    <Signup onSwitchToLogin={() => setAuthMode('login')} />
-  ) : (
-    <Login onSwitchToSignup={() => setAuthMode('signup')} />
-  );
+  return <Login />;
 };
 
 const App: React.FC = () => {

@@ -797,7 +797,7 @@ const SimpleWhatsApp: React.FC = () => {
 
         {/* ADD CONTACT FORM */}
         {showAddContact && (
-          <div className="form-section">
+          <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
             <h3>Add New Contact</h3>
             <div className="form-group">
               <input
@@ -835,7 +835,7 @@ const SimpleWhatsApp: React.FC = () => {
 
         {/* IMPORT CSV FORM */}
         {showImport && (
-          <div className="form-section">
+          <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
             <h3>Import Contacts from CSV</h3>
             <p>Format: Name,Phone,Email</p>
             <textarea
@@ -913,7 +913,7 @@ const SimpleWhatsApp: React.FC = () => {
 
         {/* CREATE GROUP FORM */}
         {showCreateGroup && (
-          <div className="form-section">
+          <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
             <h3>Create New Group</h3>
             <input
               type="text"
@@ -1023,7 +1023,7 @@ const SimpleWhatsApp: React.FC = () => {
           </div>
 
           {/* Message Input */}
-          <div className="message-form">
+          <div className="message-form" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}

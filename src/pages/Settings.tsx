@@ -1362,7 +1362,7 @@ const Settings: React.FC = () => {
 
             <form onSubmit={handleDynamicPageSubmit} style={{ padding: '20px' }}>
               {/* Basic Info Section */}
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>📋 Basic Information</h3>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -1457,7 +1457,7 @@ const Settings: React.FC = () => {
               </div>
 
               {/* Banner Section */}
-              <div className="form-section" style={{ marginTop: '30px' }}>
+              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>🎯 Page Banner</h3>
                 
                 <div className="form-group">
@@ -1581,7 +1581,7 @@ const Settings: React.FC = () => {
               </div>
 
               {/* Sections Management */}
-              <div className="form-section" style={{ marginTop: '30px' }}>
+              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3>📝 Page Sections</h3>
                   <button 
@@ -1742,7 +1742,8 @@ const Settings: React.FC = () => {
                     padding: '40px', 
                     color: 'var(--text-secondary)',
                     border: '2px dashed var(--border-color)',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
+                    background: 'var(--surface-color)'
                   }}>
                     <p>No sections added yet. Click "Add Section" to get started.</p>
                   </div>
@@ -1750,7 +1751,7 @@ const Settings: React.FC = () => {
               </div>
 
               {/* Admin Dashboard Section Selection */}
-              <div className="form-section" style={{ marginTop: '30px' }}>
+              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>📊 Admin Dashboard Sections</h3>
                 <p>Select which sections of this page should be displayed on the admin dashboard.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
@@ -1778,7 +1779,7 @@ const Settings: React.FC = () => {
               </div>
 
               {/* ✅ NEW: Admin Dashboard Display Section */}
-              <div className="form-section" style={{ marginTop: '30px' }}>
+              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>📊 Admin Dashboard Display</h3>
                 
                 <div className="form-group" style={{ marginBottom: '20px' }}>
@@ -1869,7 +1870,7 @@ const Settings: React.FC = () => {
                     </div>
                     
                     {(dynamicPageFormData.selectedSectionsForAdmin || []).length > 0 && ( // ✅ Safe check
-                      <div style={{ 
+                      <div style={{
                         marginTop: '10px', 
                         padding: '10px', 
                         backgroundColor: 'rgba(16, 185, 129, 0.1)', 

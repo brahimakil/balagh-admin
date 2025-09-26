@@ -356,7 +356,7 @@ const MartyrsStories: React.FC = () => {
             </div>
             
             <div className="form-container">
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>Original Submission</h3>
                 <div className="form-row">
                   <div className="form-group">
@@ -388,7 +388,7 @@ const MartyrsStories: React.FC = () => {
                 )}
               </div>
 
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>Submitter Information (Admin Edit)</h3>
                 <div className="form-row">
                   <div className="form-group">
@@ -438,7 +438,7 @@ const MartyrsStories: React.FC = () => {
                 </div>
               </div>
 
-              <div className="form-section">
+              <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>Story Content (Admin Edit)</h3>
                 <div className="form-row">
                   <div className="form-group">
