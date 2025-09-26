@@ -23,6 +23,7 @@ export interface UserPermissions {
   martyrs: boolean;
   wars: boolean;
   locations: boolean;
+  sectors: boolean; // ← ADD THIS LINE
   villages: boolean; // ✅ NEW: Villages permission
   activities: boolean;
   activityTypes: boolean;
@@ -328,7 +329,6 @@ export const usersService = {
       const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
       
       const docRef = doc(db, COLLECTION_NAME, id);
-      // ✅ FIXED: Only include profilePhoto if it's not undefined/empty
       const updateData: any = {
         ...userData,
         fullName: fullName || userData.email,
@@ -340,10 +340,23 @@ export const usersService = {
         updateData.profilePhoto = profilePhotoUrl;
       }
 
-      // ✅ FIX: Only add assignedVillageId if it has a value
-      if (userData.assignedVillageId) {
-        updateData.assignedVillageId = userData.assignedVillageId;
+      // ✅ FIX: Handle assignedVillageId properly
+      if (userData.assignedVillageId !== undefined) {
+        if (userData.assignedVillageId === null || userData.assignedVillageId === '') {
+          // Remove the field if it's null or empty string
+          updateData.assignedVillageId = null;
+        } else {
+          // Only set if it has a valid value
+          updateData.assignedVillageId = userData.assignedVillageId;
+        }
       }
+
+      // Remove any undefined values before updating
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key];
+        }
+      });
 
       await updateDoc(docRef, updateData);
       

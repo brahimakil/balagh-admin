@@ -478,9 +478,10 @@ const Admins: React.FC = () => {
                     <select
                       value={formData.assignedVillageId}
                       onChange={(e) => setFormData(prev => ({ ...prev, assignedVillageId: e.target.value }))}
-                      required={formData.role === 'village_editor'} // ✅ Required only for village_editor
+                      required={formData.role === 'village_editor'}
                     >
                       {formData.role === 'secondary' && <option value="">No Village</option>}
+                      {formData.role === 'village_editor' && <option value="">-- Select a Village --</option>}
                       {villages.map(village => (
                         <option key={village.id} value={village.id}>
                           {village.nameEn} - {village.nameAr}
@@ -527,6 +528,7 @@ const Admins: React.FC = () => {
                             martyrs: 'Martyrs',
                             wars: '⚔️ Wars',
                             locations: 'Locations',
+                            sectors: 'Sectors (قطاعات)', // ← ADD THIS LINE
                             villages: 'Villages',
                             activities: 'Activities',
                             activityTypes: 'Activity Types',

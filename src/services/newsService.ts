@@ -30,6 +30,7 @@ export interface News {
   liveStartTime?: Date; // When live news was activated
   publishDate?: Date; // OPTIONAL for backward compatibility
   publishTime?: string; // OPTIONAL for backward compatibility
+  isPressNews?: boolean; // ✅ NEW: Press news identifier
   createdAt: Date;
   updatedAt: Date;
 }

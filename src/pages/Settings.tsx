@@ -59,6 +59,13 @@ const Settings: React.FC = () => {
   const [headerMenuColor, setHeaderMenuColor] = useState('#333333');
   const [headerMenuHoverColor, setHeaderMenuHoverColor] = useState('#007bff');
 
+  // Add section ordering state after the existing state variables (around line 31)
+  const [sectionOrder, setSectionOrder] = useState({
+    map: 1,
+    martyrs: 2,
+    activities: 3
+  });
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -74,6 +81,13 @@ const Settings: React.FC = () => {
       setNewsTickerHeight(settingsData.newsTickerHeight || 40); // ✅ NEW
       setHeaderMenuColor(settingsData.headerMenuColor || '#333333');
       setHeaderMenuHoverColor(settingsData.headerMenuHoverColor || '#007bff');
+      
+      // Load section order
+      setSectionOrder(settingsData.sectionOrder || {
+        map: 1,
+        martyrs: 2,
+        activities: 3
+      });
     } catch (error) {
       console.error('Error loading settings:', error);
       setError('Failed to load website settings');
@@ -247,6 +261,49 @@ const Settings: React.FC = () => {
     }
   };
 
+  // Add this new function to save section order
+  const saveSectionOrder = async () => {
+    if (!currentUser?.email) {
+      setError('User not authenticated');
+      return;
+    }
+
+    // Validation: Check for duplicate positions
+    const positions = Object.values(sectionOrder);
+    const uniquePositions = new Set(positions);
+    
+    if (positions.length !== uniquePositions.size) {
+      setError('Each section must have a unique position. No two sections can have the same number.');
+      return;
+    }
+
+    // Validation: Check if all positions 1, 2, 3 are used
+    const sortedPositions = positions.sort();
+    if (sortedPositions.join(',') !== '1,2,3') {
+      setError('All positions (1, 2, 3) must be used. Each section needs a different position.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(''); // Clear any previous errors
+      
+      await websiteSettingsService.updateSectionOrder(
+        sectionOrder,
+        currentUser.email,
+        currentUserData?.fullName
+      );
+      
+      setSuccess('Section order updated successfully'); // ✅ This shows the success message
+      await loadSettings();
+    } catch (error) {
+      console.error('Error updating section order:', error);
+      setError('Failed to update section order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       titleEn: '',
@@ -373,8 +430,8 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Error/Success Messages */}
-      {error && <div className="error-message">{error}</div>}
-      {success && <div className="success-message">{success}</div>}
+      {success && <div className="alert alert-success">✅ {success}</div>}
+      {error && <div className="alert alert-error">❌ {error}</div>}
 
       {/* Main Logo Settings */}
       <div className="settings-section">
@@ -634,6 +691,84 @@ const Settings: React.FC = () => {
           >
             Update Header Colors
           </button>
+        </div>
+      </div>
+
+      {/* Section Order Settings */}
+      <div className="settings-section">
+        <h3>📋 Dashboard Section Order</h3>
+        <p>Control the order of sections on the main dashboard (after the banner)</p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+          <div className="form-group">
+            <label>🗺️ Interactive Map Position</label>
+            <select
+              value={sectionOrder.map}
+              onChange={(e) => setSectionOrder({...sectionOrder, map: parseInt(e.target.value)})}
+            >
+              <option value={1}>1st (First)</option>
+              <option value={2}>2nd (Second)</option>
+              <option value={3}>3rd (Third)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label>👥 Martyrs Section Position</label>
+            <select
+              value={sectionOrder.martyrs}
+              onChange={(e) => setSectionOrder({...sectionOrder, martyrs: parseInt(e.target.value)})}
+            >
+              <option value={1}>1st (First)</option>
+              <option value={2}>2nd (Second)</option>
+              <option value={3}>3rd (Third)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label>📅 Activities Section Position</label>
+            <select
+              value={sectionOrder.activities}
+              onChange={(e) => setSectionOrder({...sectionOrder, activities: parseInt(e.target.value)})}
+            >
+              <option value={1}>1st (First)</option>
+              <option value={2}>2nd (Second)</option>
+              <option value={3}>3rd (Third)</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="form-group">
+          <button 
+            className="btn btn-primary"
+            onClick={saveSectionOrder}
+            disabled={loading}
+          >
+            {loading ? 'Saving...' : '💾 Save Section Order'}
+          </button>
+        </div>
+        
+        <div style={{
+          background: 'var(--surface-color)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          padding: '15px',
+          marginTop: '10px'
+        }}>
+          <p style={{ margin: '5px 0', color: 'var(--text-primary)' }}>
+            <strong>Current Order Preview:</strong>
+          </p>
+          <ol style={{ margin: '8px 0 0 20px', color: 'var(--text-primary)' }}>
+            <li>🎯 Hero Banner (always first)</li>
+            {Object.entries(sectionOrder)
+              .sort(([,a], [,b]) => a - b)
+              .map(([section, position]) => (
+                <li key={section} style={{ margin: '3px 0', color: 'var(--text-primary)' }}>
+                  {section === 'map' && '🗺️ Interactive Map'}
+                  {section === 'martyrs' && '👥 Martyrs Section'}
+                  {section === 'activities' && '📅 Activities Section'}
+                </li>
+              ))}
+          </ol>
         </div>
       </div>
 

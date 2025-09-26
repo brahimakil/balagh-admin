@@ -1,35 +1,45 @@
 import QRCode from 'qrcode';
 
-// ✅ Helper function to create SEO-friendly slug
-const createMartyrSlug = (martyr: { id?: string; nameEn: string; nameAr: string }): string => {
-  const name = (martyr.nameEn || '').toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-    .replace(/\s+/g, '-')         // Replace spaces with hyphens
-    .replace(/-+/g, '-')          // Replace multiple hyphens with single
+// ✅ Updated Helper function to create slug with double dashes between names
+const createMartyrSlug = (martyr: { 
+  nameEn: string; 
+  nameAr: string; 
+  jihadistNameEn?: string; 
+  jihadistNameAr?: string; 
+}): string => {
+  const mainName = (martyr.nameEn || '').toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
     .trim();
-  
-  return `${name}-${martyr.id}`;
+
+  const jihadistName = (martyr.jihadistNameEn || '').toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+
+  return jihadistName ? `${mainName}--${jihadistName}` : mainName;
 };
 
-// ✅ ONE UNIFIED FUNCTION
+// ✅ Updated function with more professional logo
 export const generateMartyrQRCode = async (
   martyr: {
-    id?: string;
     nameEn: string;
     nameAr: string;
+    jihadistNameEn?: string;
+    jihadistNameAr?: string;
   },
   logoPath: string,
   quality: 'standard' | 'print' = 'standard'
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const timestamp = Date.now();
     const slug = createMartyrSlug(martyr);
-    const qrData = `https://balaghlb.com/martyrs/${slug}?t=${timestamp}`;
+    const qrData = `https://balaghlb.com/martyrs/${slug}`;
 
-    // Quality settings
     const settings = quality === 'print' 
-      ? { width: 600, margin: 4, logoSize: 0.16, padding: 30 }
-      : { width: 400, margin: 3, logoSize: 0.18, padding: 20 };
+      ? { width: 600, margin: 4, logoSize: 0.22, padding: 30 } // ⬅️ slightly bigger
+      : { width: 400, margin: 3, logoSize: 0.24, padding: 20 };
 
     console.log(`🔗 Generating ${quality.toUpperCase()} QR Code for URL:`, qrData);
 
@@ -66,29 +76,43 @@ export const generateMartyrQRCode = async (
         try {
           const qrSize = canvas.width;
           const logoSize = qrSize * settings.logoSize;
-          const whiteSpaceSize = logoSize + settings.padding;
+      
+          // Make white background box slightly bigger
+          const whiteBoxSize = logoSize * 1.2; // ⬅️ 20% bigger than logo
+          const whiteBoxX = (qrSize - whiteBoxSize) / 2;
+          const whiteBoxY = (qrSize - whiteBoxSize) / 2;
+      
           const logoX = (qrSize - logoSize) / 2;
           const logoY = (qrSize - logoSize) / 2;
-          const whiteSpaceX = (qrSize - whiteSpaceSize) / 2;
-          const whiteSpaceY = (qrSize - whiteSpaceSize) / 2;
-
-          // White background
+      
+          // White background with rounded corners
+          const borderRadius = whiteBoxSize * 0.2;
           ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(whiteSpaceX, whiteSpaceY, whiteSpaceSize, whiteSpaceSize);
-
-          // Border
+          ctx.beginPath();
+          ctx.moveTo(whiteBoxX + borderRadius, whiteBoxY);
+          ctx.lineTo(whiteBoxX + whiteBoxSize - borderRadius, whiteBoxY);
+          ctx.quadraticCurveTo(whiteBoxX + whiteBoxSize, whiteBoxY, whiteBoxX + whiteBoxSize, whiteBoxY + borderRadius);
+          ctx.lineTo(whiteBoxX + whiteBoxSize, whiteBoxY + whiteBoxSize - borderRadius);
+          ctx.quadraticCurveTo(whiteBoxX + whiteBoxSize, whiteBoxY + whiteBoxSize, whiteBoxX + whiteBoxSize - borderRadius, whiteBoxY + whiteBoxSize);
+          ctx.lineTo(whiteBoxX + borderRadius, whiteBoxY + whiteBoxSize);
+          ctx.quadraticCurveTo(whiteBoxX, whiteBoxY + whiteBoxSize, whiteBoxX, whiteBoxY + whiteBoxSize - borderRadius);
+          ctx.lineTo(whiteBoxX, whiteBoxY + borderRadius);
+          ctx.quadraticCurveTo(whiteBoxX, whiteBoxY, whiteBoxX + borderRadius, whiteBoxY);
+          ctx.closePath();
+          ctx.fill();
+      
+          // Border around box
           ctx.strokeStyle = quality === 'print' ? '#CCCCCC' : '#E0E0E0';
           ctx.lineWidth = quality === 'print' ? 2 : 1;
-          ctx.strokeRect(whiteSpaceX, whiteSpaceY, whiteSpaceSize, whiteSpaceSize);
-
-          // Logo
-          if (quality === 'print') {
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-          }
+          ctx.stroke();
+      
+          // Logo inside, transparent
+          ctx.save();
+          ctx.globalAlpha = 0.88; // ⬅️ a bit transparent
           ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-
-          console.log(`✅ ${quality.toUpperCase()} QR Code with logo generated`);
+          ctx.restore();
+      
+          console.log(`✅ ${quality.toUpperCase()} QR Code with improved logo generated`);
           resolve(canvas.toDataURL('image/png', 1.0));
         } catch (logoError) {
           console.error('❌ Error drawing logo:', logoError);
@@ -106,10 +130,10 @@ export const generateMartyrQRCode = async (
   });
 };
 
-// ✅ KEEP LEGACY FUNCTION FOR BACKWARDS COMPATIBILITY
+// ✅ Legacy for backwards compatibility
 export const generatePrintQualityQRCode = async (
   martyr: { id?: string; nameEn: string; nameAr: string; },
   logoPath: string
 ): Promise<string> => {
   return generateMartyrQRCode(martyr, logoPath, 'print');
-}; 
+};

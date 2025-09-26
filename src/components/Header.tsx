@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from '../context/TranslationContext';
+import SessionStatus from './SessionStatus';
 
 interface HeaderProps {
   pageTitle: string;
@@ -192,56 +193,59 @@ const Header: React.FC<HeaderProps> = ({
         <h1>{pageTitle}</h1>
       </div>
       <div className="header-actions">
-        {/* Custom Language Switcher */}
-        <div className="language-switcher">
-          <button 
-            className="language-toggle-btn"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            aria-label="Change language"
+  {/* Session Status - NEW */}
+  <SessionStatus />
+  
+  {/* Custom Language Switcher */}
+  <div className="language-switcher">
+    <button 
+      className="language-toggle-btn"
+      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+      aria-label="Change language"
+    >
+      <span className="language-flag">{currentLanguageInfo.flag}</span>
+      <span className="language-name">{currentLanguageInfo.name}</span>
+      <span className="dropdown-arrow">▼</span>
+    </button>
+    
+    {isDropdownOpen && (
+      <div className="language-dropdown">
+        {languages.map((lang) => (
+          <button
+            key={lang.code}
+            className={`language-option ${currentLang === lang.code ? 'active' : ''}`}
+            onClick={() => triggerGoogleTranslate(lang.code)}
           >
-            <span className="language-flag">{currentLanguageInfo.flag}</span>
-            <span className="language-name">{currentLanguageInfo.name}</span>
-            <span className="dropdown-arrow">▼</span>
+            <span className="language-flag">{lang.flag}</span>
+            <span className="language-name">{lang.name}</span>
           </button>
-          
-          {isDropdownOpen && (
-            <div className="language-dropdown">
-              {languages.map((lang) => (
-                <button
-                  key={lang.code}
-                  className={`language-option ${currentLang === lang.code ? 'active' : ''}`}
-                  onClick={() => triggerGoogleTranslate(lang.code)}
-                >
-                  <span className="language-flag">{lang.flag}</span>
-                  <span className="language-name">{lang.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        <button 
-          className="theme-toggle"
-          onClick={toggleTheme}
-          aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-          title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-        >
-          {isDarkMode ? '☀️' : '🌙'}
-        </button>
-        <button 
-          className="view-home-btn"
-          onClick={() => window.open('https://www.balaghlb.com/', '_blank')}
-          title="View Public Website"
-        >
-          🏠 View Home
-        </button>
-        <div className="user-info">
-          <div className="user-avatar">
-            {currentUser?.email ? getInitials(currentUser.email) : 'U'}
-          </div>
-          <span className="user-email">{currentUser?.email}</span>
-        </div>
+        ))}
       </div>
+    )}
+  </div>
+  
+  <button 
+    className="theme-toggle"
+    onClick={toggleTheme}
+    aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+    title={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+  >
+    {isDarkMode ? '☀️' : '🌙'}
+  </button>
+  <button 
+    className="view-home-btn"
+    onClick={() => window.open('https://www.balaghlb.com/', '_blank')}
+    title="View Public Website"
+  >
+    🏠 View Home
+  </button>
+  <div className="user-info">
+    <div className="user-avatar">
+      {currentUser?.email ? getInitials(currentUser.email) : 'U'}
+    </div>
+    <span className="user-email">{currentUser?.email}</span>
+  </div>
+</div>
     </header>
   );
 };

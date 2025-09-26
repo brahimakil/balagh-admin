@@ -165,13 +165,14 @@ const Activities: React.FC = () => {
   // ✅ ADD: Add this handleSubmit function (around line 150-200, after handleEdit)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 FORM SUBMITTED');
-    console.log('📋 Form data isPrivate:', formData.isPrivate);
-    console.log('🔄 editingActivity:', editingActivity?.id);
     
     try {
       setLoading(true);
       setError('');
+      setSuccess(''); // Clear previous messages
+      
+      // Show saving progress
+      setSuccess('💾 Saving activity and sending notifications...');
       
       const activityData = {
         activityTypeId: formData.activityTypeId,
@@ -203,7 +204,28 @@ const Activities: React.FC = () => {
           selectedVideos, // ✅ ADD: new videos  
           selectedMainImageFile || undefined // ✅ ADD: main image file
         );
-        setSuccess('Activity updated successfully');
+        
+        // ✅ Enhanced success message with email notification info
+        const userRole = currentUserData?.role;
+        let emailMessage = '';
+        
+        if (userRole === 'village_editor') {
+          emailMessage = ' 📧 Email notifications sent to Main Admin and Secondary Admins.';
+        } else if (userRole === 'secondary') {
+          emailMessage = ' 📧 Email notification sent to Main Admin.';
+        } else if (userRole === 'main') {
+          emailMessage = ' 📧 Email notifications sent to relevant admins.';
+        }
+        
+        const successMsg = `✅ Activity updated successfully!${emailMessage}`;
+        setSuccess(successMsg);
+        
+        // Auto-clear success message after 5 seconds
+        setTimeout(() => setSuccess(''), 5000);
+        
+        // ✅ FIX: Also update activity statuses after editing
+        await activitiesService.updateActivityStatuses();
+        
       } else {
         // ✅ ADD new activity
         console.log('➕ ADDING new activity');
@@ -212,7 +234,25 @@ const Activities: React.FC = () => {
           currentUser?.email,
           currentUserData?.fullName
         );
-        setSuccess('Activity added successfully');
+        
+        // ✅ Enhanced success message for new activities
+        const userRole = currentUserData?.role;
+        let emailMessage = '';
+        
+        if (userRole === 'village_editor') {
+          emailMessage = ' 📧 Email notifications sent to Main Admin and Secondary Admins.';
+        } else if (userRole === 'secondary') {
+          emailMessage = ' 📧 Email notification sent to Main Admin.';
+        } else if (userRole === 'main') {
+          emailMessage = ' 📧 Email notifications sent to relevant admins.';
+        }
+        
+        const successMsg = `✅ Activity added successfully!${emailMessage}`;
+        setSuccess(successMsg);
+        
+        // Auto-clear success message after 5 seconds
+        setTimeout(() => setSuccess(''), 5000);
+        
         // ✅ ADD: Immediately update activity statuses after creating
         await activitiesService.updateActivityStatuses();
       }
@@ -223,7 +263,14 @@ const Activities: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Error saving activity:', error);
-      setError('Failed to save activity');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('email') || errorMessage.includes('notification')) {
+        setSuccess('✅ Activity saved successfully!');
+        setError(`⚠️ Email notifications may have failed: ${errorMessage}`);
+      } else {
+        setError(`❌ Failed to save activity: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -249,8 +296,9 @@ const Activities: React.FC = () => {
     setImagePreview('');
     setEditingActivity(null); // ✅ CRITICAL: Clear editing state
     setShowForm(false);
-    setError('');
-    setSuccess('');
+    // ❌ REMOVE these lines that clear the messages:
+    // setError('');
+    // setSuccess('');
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setSelectedMainImageFile(null);

@@ -13,12 +13,12 @@ import {
   Timestamp,
   limit
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 export interface Notification {
   id?: string;
   action: 'created' | 'updated' | 'deleted' | 'approved' | 'rejected'; // Add approval actions
-  entityType: 'martyrs' | 'locations' | 'legends' | 'activities' | 'activityTypes' | 'news' | 'liveNews' | 'admins';
+  entityType: 'martyrs' | 'locations' | 'legends' | 'activities' | 'activityTypes' | 'news' | 'liveNews' | 'admins' | 'sectors';
   entityId: string;
   entityName: string; // Name/title of the entity that was modified
   performedBy: string; // Email of admin who performed the action
@@ -53,7 +53,15 @@ export const notificationsService = {
         timestamp: Timestamp.fromDate(new Date()),
         readBy: [] // EMPTY ARRAY - nobody has read it yet, not even the creator
       };
-      
+
+      // ADD UID TO SATISFY FIRESTORE RULES
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        console.error('❌ No authenticated UID found. Notification write would fail rules, skipping.');
+        return;
+      }
+      cleanNotification.userId = uid;
+
       // Only add optional fields if they exist and are not undefined
       if (notification.performedByName && notification.performedByName.trim()) {
         cleanNotification.performedByName = notification.performedByName;
@@ -64,8 +72,93 @@ export const notificationsService = {
       }
       
       const docRef = await addDoc(collection(db, COLLECTION_NAME), cleanNotification);
-      
       console.log('✅ Notification added successfully with ID:', docRef.id);
+
+      // 📧 Role-based email policy
+      try {
+        // Determine sender role and village
+        const sender = await notificationsService.getUserByEmail(notification.performedBy);
+        const senderRole = sender?.role as ('main' | 'secondary' | 'village_editor') | undefined;
+        const senderVillageId = sender?.assignedVillageId as string | undefined;
+
+        // Compute recipients per your policy
+        let recipientEmails: string[] = [];
+
+        if (senderRole === 'secondary' && senderVillageId) {
+          // Secondary with village -> send to village editors of same village
+          const sameVillageUsers = await notificationsService.getUsersFromSameVillage(senderVillageId);
+          recipientEmails = sameVillageUsers
+            .filter(u => u.role === 'village_editor')
+            .map(u => u.email)
+            .filter(Boolean);
+        } else if (senderRole === 'village_editor' && senderVillageId) {
+          // Village editor with village -> send to secondary admins of same village
+          const sameVillageUsers = await notificationsService.getUsersFromSameVillage(senderVillageId);
+          recipientEmails = sameVillageUsers
+            .filter(u => u.role === 'secondary')
+            .map(u => u.email)
+            .filter(Boolean);
+        } else {
+          // main admin OR no village -> no email
+          recipientEmails = [];
+        }
+
+        // Deduplicate recipients
+        recipientEmails = Array.from(new Set(recipientEmails));
+
+        // EMAIL SENDING IS NON-BLOCKING AND NEVER BLOCKS THE UI/SAVE
+        if (recipientEmails.length === 0) {
+          console.log('✉️ Skipping email per role-based policy (no recipients for this action).');
+        } else {
+          // Fire-and-forget in the background; no await, no throw
+          setTimeout(() => {
+            (async () => {
+              try {
+                console.log('📧 Triggering email notifications to:', recipientEmails);
+
+                // Use local backend in dev, Vercel in prod
+                const gmailBackendUrl =
+                  (import.meta as any).env?.DEV
+                    ? 'https://balaghemailbackend.vercel.app'
+                    : 'https://balaghemailbackend.vercel.app';
+
+                const resp = await fetch(`${gmailBackendUrl}/api/notifications/send-emails`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    notificationId: docRef.id,
+                    notification: {
+                      action: cleanNotification.action,
+                      entityType: cleanNotification.entityType,
+                      entityId: cleanNotification.entityId,
+                      entityName: cleanNotification.entityName,
+                      performedBy: cleanNotification.performedBy,
+                      performedByName: cleanNotification.performedByName || 'Unknown User',
+                      details: cleanNotification.details || '',
+                      timestamp: new Date().toISOString()
+                    },
+                    recipients: recipientEmails,
+                    recipientsOnly: true,
+                    performerRole: senderRole || null,
+                    performerVillageId: senderVillageId || null
+                  })
+                });
+
+                if (resp.ok) {
+                  console.log('✅ Email notifications sent successfully');
+                } else {
+                  console.warn('⚠️ Email notifications failed:', await resp.text());
+                }
+              } catch (e) {
+                console.warn('⚠️ Email notifications request failed (non-blocking):', e);
+              }
+            })();
+          }, 0);
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending email notifications:', emailError);
+        // Don't throw error - notification was created successfully, email is just a bonus
+      }
       
       // Force a slight delay to ensure Firestore propagates the change
       setTimeout(() => {
@@ -448,4 +541,4 @@ export const notificationsService = {
       return null;
     }
   }
-}; 
+};

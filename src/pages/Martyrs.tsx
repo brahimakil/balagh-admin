@@ -82,29 +82,45 @@ const Martyrs: React.FC = () => {
   };
 
   const handleTranslate = async (field: string, direction: 'toAr' | 'toEn') => {
-    const sourceField = field.replace(/En$|Ar$/, '') + (direction === 'toAr' ? 'En' : 'Ar');
-    const targetField = field.replace(/En$|Ar$/, '') + (direction === 'toAr' ? 'Ar' : 'En');
-    
-    const sourceText = formData[sourceField as keyof typeof formData] as string;
-    
+    const base = field.replace(/En$|Ar$/, '');
+    const initialSourceField = base + (direction === 'toAr' ? 'En' : 'Ar');
+    const initialTargetField = base + (direction === 'toAr' ? 'Ar' : 'En');
+
+    let effectiveSourceField = initialSourceField;
+    let effectiveDirection: 'toAr' | 'toEn' = direction;
+    let sourceText = (formData[effectiveSourceField as keyof typeof formData] as string) || '';
+
     if (!sourceText.trim()) {
-      setError('Please enter text to translate');
-      setTimeout(() => setError(''), 3000);
-      return;
+      // Fallback: if the intended source is empty, use the opposite field if it has text
+      const oppositeField = base + (direction === 'toAr' ? 'Ar' : 'En');
+      const oppositeText = (formData[oppositeField as keyof typeof formData] as string) || '';
+
+      if (oppositeText.trim()) {
+        effectiveSourceField = oppositeField;
+        // Flip the direction to match the actual source field used
+        effectiveDirection = oppositeField.endsWith('En') ? 'toAr' : 'toEn';
+        sourceText = oppositeText;
+      } else {
+        setError('Please enter text to translate');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
     }
 
     // Clear any existing errors
     setError('');
 
     try {
-      setTranslating(targetField);
-      const translatedText = direction === 'toAr' 
+      // Show spinner on the actual target field
+      setTranslating(base + (effectiveDirection === 'toAr' ? 'Ar' : 'En'));
+
+      const translatedText = effectiveDirection === 'toAr'
         ? await translationService.translateToArabic(sourceText)
         : await translationService.translateToEnglish(sourceText);
-      
+
+      const targetField = base + (effectiveDirection === 'toAr' ? 'Ar' : 'En');
       handleInputChange(targetField, translatedText);
-      
-      // Show success message briefly
+
       setSuccess('Translation completed!');
       setTimeout(() => setSuccess(''), 2000);
     } catch (error) {
@@ -397,11 +413,12 @@ const Martyrs: React.FC = () => {
       setRegeneratingQR(true);
       setError('');
 
-      // Generate new high-quality QR code with logo
+      // Generate new high-quality QR code with logo - now includes jihadist names
       const newQRCode = await generatePrintQualityQRCode({
-        id: selectedMartyrQR.id,
         nameEn: selectedMartyrQR.nameEn,
-        nameAr: selectedMartyrQR.nameAr
+        nameAr: selectedMartyrQR.nameAr,
+        jihadistNameEn: selectedMartyrQR.jihadistNameEn,
+        jihadistNameAr: selectedMartyrQR.jihadistNameAr
       }, logoPath);
 
       // ✅ FIX: Update the martyr with complete object, only changing the QR code
@@ -792,7 +809,7 @@ const Martyrs: React.FC = () => {
                     value={formData.warId}
                     onChange={(e) => handleInputChange('warId', e.target.value)}
                   >
-                    <option value="">Select a war (optional)</option>
+                    <option value="">Select a war (important for qr code functionality)</option>
                     {wars.length === 0 && (
                       <option value="" disabled>No wars available - add wars in Wars Management first</option>
                     )}

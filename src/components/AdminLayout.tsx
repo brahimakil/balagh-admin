@@ -21,7 +21,8 @@ import Settings from '../pages/Settings';
 import MartyrsStories from '../pages/MartyrsStories';
 import Villages from '../pages/Villages';
 import ImportsExports from '../pages/ImportsExports';
-import WhatsApp from '../pages/WhatsApp';
+import SimpleWhatsApp from '../pages/SimpleWhatsApp';
+import Sectors from '../pages/Sectors';
 
 
 const AdminLayout: React.FC = () => {
@@ -56,7 +57,8 @@ const AdminLayout: React.FC = () => {
       'admins': 'Admins Management',
       'settings': 'Website Settings',
       'imports-exports': 'Imports/Exports',
-      'whatsapp': 'WhatsApp Management'
+      'whatsapp': 'WhatsApp Management',
+      'sectors': 'Sectors Management'
     };
     return titles[item] || 'Admin Panel';
   };
@@ -77,7 +79,8 @@ const AdminLayout: React.FC = () => {
         'notifications': 'notifications',
         'admins': 'admins',
         'settings': 'settings',
-        'whatsapp': 'whatsapp'
+        'whatsapp': 'whatsapp',
+        'sectors': 'sectors'
       };
       
       const requiredPermission = permissionMap[item];
@@ -157,7 +160,8 @@ const AdminLayout: React.FC = () => {
         'notifications': 'notifications',
         'admins': 'admins',
         'settings': 'settings',
-        'whatsapp': 'whatsapp'
+        'whatsapp': 'whatsapp',
+        'sectors': 'sectors'
       };
       
       const requiredPermission = permissionMap[currentPath];
@@ -191,6 +195,7 @@ const AdminLayout: React.FC = () => {
             <Route path="martyrs" element={<Martyrs />} />
             <Route path="wars" element={<Wars />} />
             <Route path="locations" element={<Locations />} />
+            <Route path="sectors" element={<Sectors />} />
             <Route path="villages" element={<Villages />} />
             <Route path="activities" element={<Activities />} />
             <Route path="activity-types" element={<ActivityTypes />} />
@@ -202,7 +207,7 @@ const AdminLayout: React.FC = () => {
             <Route path="settings" element={<Settings />} />
             <Route path="martyrs-stories" element={<MartyrsStories />} />
             <Route path="imports-exports" element={<ImportsExports />} />
-            <Route path="whatsapp" element={<WhatsApp />} />
+            <Route path="whatsapp" element={<SimpleWhatsApp />} />
             <Route path="" element={<Dashboard />} />
           </Routes>
         </main>

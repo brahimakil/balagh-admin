@@ -31,7 +31,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     liveDurationHours: 2,
     mainImage: '',
     publishDate: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
-    publishTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) // Current time in HH:MM format
+    publishTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), // Current time in HH:MM format
+    isPressNews: false // ✅ NEW: Press news checkbox
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -89,7 +90,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       liveDurationHours: 2,
       mainImage: '',
       publishDate: now.toISOString().split('T')[0],
-      publishTime: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      publishTime: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      isPressNews: false // ✅ Reset isPressNews
     });
     setEditingNews(null);
     setShowForm(false);
@@ -176,6 +178,9 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       type: defaultType,
       liveDurationHours: 2,
       mainImage: '',
+      publishDate: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
+      publishTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), // Current time in HH:MM format
+      isPressNews: false // ✅ Reset isPressNews
     });
     setImagePreview('');
     setSelectedPhotos([]);
@@ -203,7 +208,8 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       liveDurationHours: newsItem.liveDurationHours || 2,
       mainImage: newsItem.mainImage,
       publishDate, // Always current date
-      publishTime  // Always current time
+      publishTime,  // Always current time
+      isPressNews: newsItem.isPressNews || false // ✅ NEW: Load isPressNews value
     });
     setImagePreview(newsItem.mainImage);
     setSelectedPhotos([]);
@@ -533,6 +539,20 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                       />
                     </div>
                   )}
+                </div>
+
+                {/* ✅ Keep this one - it's properly styled */}
+                <div className="form-row">
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.isPressNews || false}
+                        onChange={(e) => handleInputChange('isPressNews', e.target.checked)}
+                      />
+                      📰 Press News (خبر صحفي)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Title Fields */}

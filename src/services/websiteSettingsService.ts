@@ -43,6 +43,11 @@ export interface WebsiteSettings {
   headerMenuHoverColor: string; // ✅ NEW: Header menu hover color
   lastUpdated: Date;
   updatedBy: string;
+  sectionOrder?: {
+    map: number;
+    martyrs: number;
+    activities: number;
+  };
 }
 
 const COLLECTION_NAME = 'websiteSettings';
@@ -138,7 +143,8 @@ export const websiteSettingsService = {
           headerMenuColor: data.headerMenuColor || '#333333', // ✅ NEW
           headerMenuHoverColor: data.headerMenuHoverColor || '#007bff', // ✅ NEW
           lastUpdated: data.lastUpdated?.toDate(),
-          updatedBy: data.updatedBy
+          updatedBy: data.updatedBy,
+          sectionOrder: data.sectionOrder
         };
       } else {
         // Return default settings if document doesn't exist
@@ -153,7 +159,8 @@ export const websiteSettingsService = {
           headerMenuColor: '#333333', // ✅ NEW: Default menu color
           headerMenuHoverColor: '#007bff', // ✅ NEW: Default hover color
           lastUpdated: new Date(),
-          updatedBy: 'System'
+          updatedBy: 'System',
+          sectionOrder: { map: 1, martyrs: 2, activities: 3 } // Default section order
         };
       }
     } catch (error) {
@@ -373,6 +380,31 @@ export const websiteSettingsService = {
       console.error('Error updating header colors:', error);
       throw error;
     }
+  },
+
+  // Add this method
+  async updateSectionOrder(
+    sectionOrder: { map: number; martyrs: number; activities: number },
+    updatedBy: string,
+    updatedByName?: string
+  ): Promise<void> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, SETTINGS_DOC_ID);
+      
+      await updateDoc(docRef, {
+        sectionOrder,
+        lastUpdated: Timestamp.fromDate(new Date()),
+        updatedBy,
+        updatedByName: updatedByName || updatedBy
+      });
+
+      // Remove the notification part since it's causing the error
+      console.log('Section order updated successfully');
+      
+    } catch (error) {
+      console.error('Error updating section order:', error);
+      throw error;
+    }
   }
 };
 
@@ -394,5 +426,6 @@ const getDefaultSettings = (): WebsiteSettings => ({
   headerMenuColor: '#333333', // ✅ NEW: Default menu color
   headerMenuHoverColor: '#007bff', // ✅ NEW: Default hover color
   lastUpdated: new Date(),
-  updatedBy: 'System'
+  updatedBy: 'System',
+  sectionOrder: { map: 1, martyrs: 2, activities: 3 } // Default section order
 });
