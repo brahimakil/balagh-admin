@@ -16,7 +16,10 @@ const AppContent: React.FC = () => {
     return <div className="loading">Loading...</div>;
   }
 
-  if (!currentUser) {
+  // ✅ Check if user is in 2FA verification process
+  const isVerifying2FA = localStorage.getItem('verifying2FA') === 'true';
+
+  if (!currentUser || isVerifying2FA) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />

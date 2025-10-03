@@ -290,7 +290,7 @@ const Sectors: React.FC = () => {
     });
   };
 
-  const handlePrayerTimingChange = (locationId: string, prayerTiming: 'before_dohor' | 'after_dohor') => {
+  const handlePrayerTimingChange = (locationId: string, prayerTiming: 'before_dohor' | 'after_dohor' | 'always_visible') => {
     console.log('🕌 Changing prayer timing for location:', locationId, 'to:', prayerTiming);
     
     setFormData(prev => {
@@ -307,7 +307,7 @@ const Sectors: React.FC = () => {
     });
   };
 
-  const getPrayerTimingForLocation = (locationId: string): 'before_dohor' | 'after_dohor' => {
+  const getPrayerTimingForLocation = (locationId: string): 'before_dohor' | 'after_dohor' | 'always_visible' => {
     const timing = formData.locationPrayerTimings.find(t => t.locationId === locationId);
     return timing?.prayerTiming || 'before_dohor';
   };
@@ -421,15 +421,17 @@ const Sectors: React.FC = () => {
                 <label>
                   Select Locations & Prayer Timing * ({formData.locationIds.length} selected)
                   {formData.locationIds.length > 0 && (
-                 <span className="ml-[10px] text-xs text-gray-500 dark:text-gray-400">
-                 <span className="mr-[10px]">
-                   🌅 Before: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}
-                 </span>
-                 <span>
-                   🌇 After: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'after_dohor').length}
-                 </span>
-               </span>
-               
+                    <span className="ml-[10px] text-xs text-gray-500 dark:text-gray-400">
+                      <span className="mr-[10px]">
+                        �� Before: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}
+                      </span>
+                      <span className="mr-[10px]">
+                        🌇 After: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'after_dohor').length}
+                      </span>
+                      <span>
+                        ⏰ Always: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'always_visible').length}
+                      </span>
+                    </span>
                   )}
                 </label>
                 <div style={{ 
@@ -486,7 +488,7 @@ const Sectors: React.FC = () => {
                           <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '8px', display: 'block' }}>
                             🕌 Prayer Timing:
                           </label>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <label style={{ 
                               display: 'flex', 
                               alignItems: 'center', 
@@ -532,6 +534,30 @@ const Sectors: React.FC = () => {
                                 style={{ margin: 0 }}
                               />
                               🌇 After Dohor
+                            </label>
+                            {/* ✅ NEW: Always Visible option */}
+                            <label style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '5px', 
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              padding: '5px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: getPrayerTimingForLocation(location.id) === 'always_visible' ? 'rgba(33, 150, 243, 0.15)' : 'transparent',
+                              border: '1px solid',
+                              borderColor: getPrayerTimingForLocation(location.id) === 'always_visible' ? '#2196f3' : 'var(--border-color)',
+                              color: 'var(--text-primary)'
+                            }}>
+                              <input
+                                type="radio"
+                                name={`prayer_${location.id}`}
+                                value="always_visible"
+                                checked={getPrayerTimingForLocation(location.id) === 'always_visible'}
+                                onChange={() => handlePrayerTimingChange(location.id, 'always_visible')}
+                                style={{ margin: 0 }}
+                              />
+                              ⏰ Always Visible
                             </label>
                           </div>
                         </div>
@@ -610,27 +636,78 @@ const Sectors: React.FC = () => {
             </div>
             
             <div style={{ marginBottom: '15px' }}>
-              <span style={{
+              <div style={{
                 background: '#e3f2fd',
                 color: '#1976d2',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '14px'
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                display: 'inline-block',
+                marginBottom: '10px'
               }}>
                 📍 {sector.locationIds.length} location{sector.locationIds.length !== 1 ? 's' : ''}
-              </span>
+              </div>
               
-              {/* Prayer Timing Summary */}
+              {/* ✅ UPDATED: Prayer Timing Summary with Always Visible */}
               {sector.locationPrayerTimings && sector.locationPrayerTimings.length > 0 && (
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              <span className="mr-2">
-                🌅 Before: {sector.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}
-              </span>
-              <span>
-                🌇 After: {sector.locationPrayerTimings.filter(t => t.prayerTiming === 'after_dohor').length}
-              </span>
-            </div>
-            
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '8px', 
+                  flexWrap: 'wrap',
+                  marginTop: '10px'
+                }}>
+                  {/* Before Dohor Count */}
+                  <div style={{
+                    background: 'rgba(76, 175, 80, 0.1)',
+                    border: '1px solid #4caf50',
+                    color: '#2e7d32',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>🌅</span>
+                    <span>Before: {sector.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}</span>
+                  </div>
+                  
+                  {/* After Dohor Count */}
+                  <div style={{
+                    background: 'rgba(255, 152, 0, 0.1)',
+                    border: '1px solid #ff9800',
+                    color: '#e65100',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>🌇</span>
+                    <span>After: {sector.locationPrayerTimings.filter(t => t.prayerTiming === 'after_dohor').length}</span>
+                  </div>
+                  
+                  {/* ✅ NEW: Always Visible Count */}
+                  <div style={{
+                    background: 'rgba(33, 150, 243, 0.1)',
+                    border: '1px solid #2196f3',
+                    color: '#1565c0',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>⏰</span>
+                    <span>Always: {sector.locationPrayerTimings.filter(t => t.prayerTiming === 'always_visible').length}</span>
+                  </div>
+                </div>
               )}
             </div>
 

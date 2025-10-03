@@ -38,8 +38,8 @@ export const generateMartyrQRCode = async (
     const qrData = `https://balaghlb.com/martyrs/${slug}`;
 
     const settings = quality === 'print' 
-      ? { width: 600, margin: 4, logoSize: 0.22, padding: 30 } // ⬅️ slightly bigger
-      : { width: 400, margin: 3, logoSize: 0.24, padding: 20 };
+      ? { width: 600, margin: 4, logoSize: 0.28, padding: 30 } // ⬅️ increased from 0.22 to 0.28
+      : { width: 400, margin: 3, logoSize: 0.30, padding: 20 }; // ⬅️ increased from 0.24 to 0.30
 
     console.log(`🔗 Generating ${quality.toUpperCase()} QR Code for URL:`, qrData);
 
@@ -77,8 +77,8 @@ export const generateMartyrQRCode = async (
           const qrSize = canvas.width;
           const logoSize = qrSize * settings.logoSize;
       
-          // Make white background box slightly bigger
-          const whiteBoxSize = logoSize * 1.2; // ⬅️ 20% bigger than logo
+          // Make white background box match logo size (no extra padding)
+          const whiteBoxSize = logoSize * 0.88; // ⬅️ changed from 1.2 to 1.0 (same as logo)
           const whiteBoxX = (qrSize - whiteBoxSize) / 2;
           const whiteBoxY = (qrSize - whiteBoxSize) / 2;
       

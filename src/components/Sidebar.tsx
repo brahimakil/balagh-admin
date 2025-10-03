@@ -10,7 +10,7 @@ interface SidebarProps {
   isDesktopCollapsed?: boolean;
 }
 
-interface MenuItem {
+interface MenuItisem {
   id: string;
   label: string;
   permission: string;
@@ -133,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     },
     { 
       id: 'whatsapp', 
-      label: 'WhatsApp', 
+      label: 'WhatsApp & Social Media',  // ← CHANGED
       icon: '📱',
       permission: 'whatsapp' 
     },

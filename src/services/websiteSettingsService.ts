@@ -20,9 +20,33 @@ export interface PageSettings {
   descriptionAr: string;
   mainImage: string; // base64 image
   colorOverlay: string; // hex color code
-  showOverlay: boolean; // ✅ NEW: Toggle to show/hide overlay
+  showOverlay: boolean;
+  titleColor?: string; // ✅ NEW: Title text color (default: white)
+  descriptionColor?: string; // ✅ NEW: Description text color (default: white)
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface DashboardSection {
+  id: string; // Unique identifier
+  type: 'fixed' | 'dynamicPage' | 'dynamicSection'; // Type of section
+  label: string; // Display name
+  icon: string; // Emoji icon
+  order: number; // Display order
+  isVisible: boolean; // Show/hide toggle
+  
+  // For fixed sections (map, martyrs, activities)
+  fixedSectionId?: 'map' | 'martyrs' | 'activities';
+  
+  // For dynamic pages (show entire page)
+  dynamicPageId?: string;
+  dynamicPageTitle?: string;
+  
+  // For dynamic page sections (show specific section)
+  dynamicSectionId?: string;
+  dynamicSectionTitle?: string;
+  parentPageId?: string;
+  parentPageTitle?: string;
 }
 
 export interface WebsiteSettings {
@@ -43,11 +67,16 @@ export interface WebsiteSettings {
   headerMenuHoverColor: string; // ✅ NEW: Header menu hover color
   lastUpdated: Date;
   updatedBy: string;
+  
+  // ✅ DEPRECATED: Old section order (kept for backwards compatibility)
   sectionOrder?: {
     map: number;
     martyrs: number;
     activities: number;
   };
+  
+  // ✅ NEW: Enhanced dashboard sections ordering
+  dashboardSections?: DashboardSection[];
 }
 
 const COLLECTION_NAME = 'websiteSettings';
@@ -63,7 +92,9 @@ const defaultPageSettings = {
     descriptionAr: 'تكريم ذكرى أبطالنا والحفاظ على إرثهم للأجيال القادمة.',
     mainImage: '',
     colorOverlay: '#000000',
-    showOverlay: true, // ✅ NEW
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW: Default white
+    descriptionColor: '#FFFFFF', // ✅ NEW: Default white
     createdAt: new Date(),
     updatedAt: new Date()
   },
@@ -75,7 +106,9 @@ const defaultPageSettings = {
     descriptionAr: 'نتذكر الأرواح الشجاعة التي ضحت بحياتها من أجل حريتنا وكرامتنا.',
     mainImage: '',
     colorOverlay: '#8B0000',
-    showOverlay: true, // ✅ NEW
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW
+    descriptionColor: '#FFFFFF', // ✅ NEW
     createdAt: new Date(),
     updatedAt: new Date()
   },
@@ -87,7 +120,9 @@ const defaultPageSettings = {
     descriptionAr: 'استكشف الأماكن المهمة التي شكلت تاريخنا وتراثنا.',
     mainImage: '',
     colorOverlay: '#2E8B57',
-    showOverlay: true, // ✅ NEW
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW
+    descriptionColor: '#FFFFFF', // ✅ NEW
     createdAt: new Date(),
     updatedAt: new Date()
   },
@@ -99,7 +134,9 @@ const defaultPageSettings = {
     descriptionAr: 'انضم إلينا في إحياء تراثنا من خلال الأنشطة والفعاليات المتنوعة.',
     mainImage: '',
     colorOverlay: '#4169E1',
-    showOverlay: true, // ✅ NEW
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW
+    descriptionColor: '#FFFFFF', // ✅ NEW
     createdAt: new Date(),
     updatedAt: new Date()
   },
@@ -107,11 +144,13 @@ const defaultPageSettings = {
     id: 'news',
     titleEn: 'Latest News',
     titleAr: 'آخر الأخبار',
-    descriptionEn: 'Stay updated with the latest news and announcements from our community.',
-    descriptionAr: 'ابق على اطلاع بآخر الأخبار والإعلانات من مجتمعنا.',
+    descriptionEn: 'Stay updated with the latest news and announcements.',
+    descriptionAr: 'ابق على اطلاع بآخر الأخبار والإعلانات.',
     mainImage: '',
-    colorOverlay: '#FF6347',
-    showOverlay: true, // ✅ NEW
+    colorOverlay: '#FF8C00',
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW
+    descriptionColor: '#FFFFFF', // ✅ NEW
     createdAt: new Date(),
     updatedAt: new Date()
   }
@@ -128,11 +167,46 @@ export const websiteSettingsService = {
         const data = docSnap.data();
         return {
           pages: {
-            home: { ...data.pages.home, showOverlay: data.pages.home.showOverlay ?? true, createdAt: data.pages.home.createdAt?.toDate(), updatedAt: data.pages.home.updatedAt?.toDate() },
-            martyrs: { ...data.pages.martyrs, showOverlay: data.pages.martyrs.showOverlay ?? true, createdAt: data.pages.martyrs.createdAt?.toDate(), updatedAt: data.pages.martyrs.updatedAt?.toDate() },
-            locations: { ...data.pages.locations, showOverlay: data.pages.locations.showOverlay ?? true, createdAt: data.pages.locations.createdAt?.toDate(), updatedAt: data.pages.locations.updatedAt?.toDate() },
-            activities: { ...data.pages.activities, showOverlay: data.pages.activities.showOverlay ?? true, createdAt: data.pages.activities.createdAt?.toDate(), updatedAt: data.pages.activities.updatedAt?.toDate() },
-            news: { ...data.pages.news, showOverlay: data.pages.news.showOverlay ?? true, createdAt: data.pages.news.createdAt?.toDate(), updatedAt: data.pages.news.updatedAt?.toDate() }
+            home: { 
+              ...data.pages.home, 
+              showOverlay: data.pages.home.showOverlay ?? true,
+              titleColor: data.pages.home.titleColor || '#FFFFFF', // ✅ NEW
+              descriptionColor: data.pages.home.descriptionColor || '#FFFFFF', // ✅ NEW
+              createdAt: data.pages.home.createdAt?.toDate(), 
+              updatedAt: data.pages.home.updatedAt?.toDate() 
+            },
+            martyrs: { 
+              ...data.pages.martyrs, 
+              showOverlay: data.pages.martyrs.showOverlay ?? true,
+              titleColor: data.pages.martyrs.titleColor || '#FFFFFF', // ✅ NEW
+              descriptionColor: data.pages.martyrs.descriptionColor || '#FFFFFF', // ✅ NEW
+              createdAt: data.pages.martyrs.createdAt?.toDate(), 
+              updatedAt: data.pages.martyrs.updatedAt?.toDate() 
+            },
+            locations: { 
+              ...data.pages.locations, 
+              showOverlay: data.pages.locations.showOverlay ?? true,
+              titleColor: data.pages.locations.titleColor || '#FFFFFF', // ✅ NEW
+              descriptionColor: data.pages.locations.descriptionColor || '#FFFFFF', // ✅ NEW
+              createdAt: data.pages.locations.createdAt?.toDate(), 
+              updatedAt: data.pages.locations.updatedAt?.toDate() 
+            },
+            activities: { 
+              ...data.pages.activities, 
+              showOverlay: data.pages.activities.showOverlay ?? true,
+              titleColor: data.pages.activities.titleColor || '#FFFFFF', // ✅ NEW
+              descriptionColor: data.pages.activities.descriptionColor || '#FFFFFF', // ✅ NEW
+              createdAt: data.pages.activities.createdAt?.toDate(), 
+              updatedAt: data.pages.activities.updatedAt?.toDate() 
+            },
+            news: { 
+              ...data.pages.news, 
+              showOverlay: data.pages.news.showOverlay ?? true,
+              titleColor: data.pages.news.titleColor || '#FFFFFF', // ✅ NEW
+              descriptionColor: data.pages.news.descriptionColor || '#FFFFFF', // ✅ NEW
+              createdAt: data.pages.news.createdAt?.toDate(), 
+              updatedAt: data.pages.news.updatedAt?.toDate() 
+            }
           },
           mainLogoDark: data.mainLogoDark || '',
           mainLogoLight: data.mainLogoLight || '',
@@ -144,7 +218,8 @@ export const websiteSettingsService = {
           headerMenuHoverColor: data.headerMenuHoverColor || '#007bff', // ✅ NEW
           lastUpdated: data.lastUpdated?.toDate(),
           updatedBy: data.updatedBy,
-          sectionOrder: data.sectionOrder
+          sectionOrder: data.sectionOrder,
+          dashboardSections: data.dashboardSections
         };
       } else {
         // Return default settings if document doesn't exist
@@ -160,7 +235,36 @@ export const websiteSettingsService = {
           headerMenuHoverColor: '#007bff', // ✅ NEW: Default hover color
           lastUpdated: new Date(),
           updatedBy: 'System',
-          sectionOrder: { map: 1, martyrs: 2, activities: 3 } // Default section order
+          sectionOrder: { map: 1, martyrs: 2, activities: 3 }, // Default section order
+          dashboardSections: [
+            {
+              id: 'fixed_map',
+              type: 'fixed',
+              label: 'Interactive Map',
+              icon: '🗺️',
+              order: 1,
+              isVisible: true,
+              fixedSectionId: 'map'
+            },
+            {
+              id: 'fixed_martyrs',
+              type: 'fixed',
+              label: 'Martyrs Section',
+              icon: '👥',
+              order: 2,
+              isVisible: true,
+              fixedSectionId: 'martyrs'
+            },
+            {
+              id: 'fixed_activities',
+              type: 'fixed',
+              label: 'Activities Section',
+              icon: '📅',
+              order: 3,
+              isVisible: true,
+              fixedSectionId: 'activities'
+            }
+          ]
         };
       }
     } catch (error) {
@@ -206,6 +310,8 @@ export const websiteSettingsService = {
           mainImage: updateData.mainImage || currentPageSettings.mainImage,
           colorOverlay: updateData.colorOverlay || currentPageSettings.colorOverlay,
           showOverlay: updateData.showOverlay ?? currentPageSettings.showOverlay ?? true, // ✅ Handle boolean properly
+          titleColor: updateData.titleColor || currentPageSettings.titleColor || '#FFFFFF', // ✅ NEW
+          descriptionColor: updateData.descriptionColor || currentPageSettings.descriptionColor || '#FFFFFF', // ✅ NEW
           createdAt: currentPageSettings.createdAt ? Timestamp.fromDate(currentPageSettings.createdAt) : Timestamp.fromDate(new Date()), // ✅ Convert Date to Timestamp
           updatedAt: Timestamp.fromDate(new Date())
         },
@@ -405,6 +511,80 @@ export const websiteSettingsService = {
       console.error('Error updating section order:', error);
       throw error;
     }
+  },
+
+  // Add this new method after updateSectionOrder
+  async updateDashboardSections(
+    dashboardSections: DashboardSection[],
+    updatedBy: string,
+    updatedByName?: string
+  ): Promise<void> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, SETTINGS_DOC_ID);
+      
+      await updateDoc(docRef, {
+        dashboardSections,
+        lastUpdated: Timestamp.fromDate(new Date()),
+        updatedBy,
+        updatedByName: updatedByName || updatedBy
+      });
+
+      console.log('Dashboard sections updated successfully');
+      
+    } catch (error) {
+      console.error('Error updating dashboard sections:', error);
+      throw error;
+    }
+  },
+
+  // Add helper method to get dashboard sections with defaults
+  async getDashboardSections(): Promise<DashboardSection[]> {
+    try {
+      const settings = await this.getWebsiteSettings();
+      
+      // If new dashboardSections exists, return it
+      if (settings.dashboardSections && settings.dashboardSections.length > 0) {
+        return settings.dashboardSections;
+      }
+      
+      // Otherwise, migrate from old sectionOrder format
+      const oldOrder = settings.sectionOrder || { map: 1, martyrs: 2, activities: 3 };
+      
+      const defaultSections: DashboardSection[] = [
+        {
+          id: 'fixed_map',
+          type: 'fixed',
+          label: 'Interactive Map',
+          icon: '��️',
+          order: oldOrder.map,
+          isVisible: true,
+          fixedSectionId: 'map'
+        },
+        {
+          id: 'fixed_martyrs',
+          type: 'fixed',
+          label: 'Martyrs Section',
+          icon: '��',
+          order: oldOrder.martyrs,
+          isVisible: true,
+          fixedSectionId: 'martyrs'
+        },
+        {
+          id: 'fixed_activities',
+          type: 'fixed',
+          label: 'Activities Section',
+          icon: '��',
+          order: oldOrder.activities,
+          isVisible: true,
+          fixedSectionId: 'activities'
+        }
+      ];
+      
+      return defaultSections;
+    } catch (error) {
+      console.error('Error getting dashboard sections:', error);
+      throw error;
+    }
   }
 };
 
@@ -427,5 +607,34 @@ const getDefaultSettings = (): WebsiteSettings => ({
   headerMenuHoverColor: '#007bff', // ✅ NEW: Default hover color
   lastUpdated: new Date(),
   updatedBy: 'System',
-  sectionOrder: { map: 1, martyrs: 2, activities: 3 } // Default section order
+  sectionOrder: { map: 1, martyrs: 2, activities: 3 }, // Default section order
+  dashboardSections: [
+    {
+      id: 'fixed_map',
+      type: 'fixed',
+      label: 'Interactive Map',
+      icon: '��️',
+      order: 1,
+      isVisible: true,
+      fixedSectionId: 'map'
+    },
+    {
+      id: 'fixed_martyrs',
+      type: 'fixed',
+      label: 'Martyrs Section',
+      icon: '��',
+      order: 2,
+      isVisible: true,
+      fixedSectionId: 'martyrs'
+    },
+    {
+      id: 'fixed_activities',
+      type: 'fixed',
+      label: 'Activities Section',
+      icon: '��',
+      order: 3,
+      isVisible: true,
+      fixedSectionId: 'activities'
+    }
+  ]
 });

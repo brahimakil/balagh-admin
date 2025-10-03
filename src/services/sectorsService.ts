@@ -16,7 +16,7 @@ import { notificationsService } from './notificationsService';
 
 export interface LocationPrayerTiming {
   locationId: string;
-  prayerTiming: 'before_dohor' | 'after_dohor';
+  prayerTiming: 'before_dohor' | 'after_dohor' | 'always_visible'; // ✅ Added 'always_visible'
 }
 
 export interface Sector {

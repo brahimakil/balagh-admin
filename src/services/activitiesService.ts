@@ -9,7 +9,8 @@ import {
   query,
   orderBy,
   where,
-  Timestamp 
+  Timestamp,
+  deleteField
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notificationsService } from './notificationsService';
@@ -229,14 +230,31 @@ export const activitiesService = {
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
+      
+      // ✅ Create clean update data without undefined values
       const updateData: any = {
-        ...updates,
         updatedAt: Timestamp.fromDate(new Date()),
       };
 
-      // Remove photos and videos from updateData if they exist
-      delete updateData.photos;
-      delete updateData.videos;
+      // ✅ Copy all fields from updates, but filter out undefined/null and special fields
+      Object.entries(updates).forEach(([key, value]) => {
+        if (
+          value !== undefined && 
+          key !== 'photos' && 
+          key !== 'videos' && 
+          key !== 'id' && 
+          key !== 'createdAt' && 
+          key !== 'updatedAt'
+        ) {
+          updateData[key] = value;
+        }
+      });
+
+      // ✅ Special case: if villageId is explicitly in updates and is empty, delete the field
+      if ('villageId' in updates && (!updates.villageId || updates.villageId === '')) {
+        updateData.villageId = deleteField();
+        console.log('🗑️ Removing villageId field from activity');
+      }
 
       // Upload main image if provided
       if (mainImageFile) {
@@ -275,6 +293,9 @@ export const activitiesService = {
           updateData.videos = [...currentVideos, ...newVideos];
         }
       }
+      
+      // ✅ Log what we're about to update
+      console.log('🔄 Update data being sent to Firebase:', updateData);
       
       await updateDoc(docRef, updateData);
       

@@ -43,11 +43,11 @@ export interface DynamicPage {
   bannerTextAr: string;
   bannerColorOverlay: string;
   showBannerOverlay: boolean;
+  bannerTitleColor?: string; // ✅ NEW: Banner title text color
+  bannerDescriptionColor?: string; // ✅ NEW: Banner description text color
   sections: DynamicPageSection[];
   isActive: boolean;
   displayOrder: number;
-  showOnAdminDashboard: boolean; // ✅ NEW: Show entire page on admin dashboard
-  selectedSectionsForAdmin: string[]; // ✅ NEW: Array of section IDs to show on admin dashboard
   createdAt: Date;
   updatedAt: Date;
 }

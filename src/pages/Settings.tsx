@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { websiteSettingsService, type PageSettings, type WebsiteSettings } from '../services/websiteSettingsService';
+import { websiteSettingsService, type PageSettings, type WebsiteSettings, type DashboardSection } from '../services/websiteSettingsService';
 import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
 import { dynamicPagesService, type DynamicPage, type DynamicPageSection } from '../services/dynamicPagesService';
 import { fileUploadService } from '../services/fileUploadService';
+import { backupService, type BackupConfig } from '../services/backupService';
 
 const Settings: React.FC = () => {
   const { currentUser, currentUserData } = useAuth();
@@ -23,7 +24,9 @@ const Settings: React.FC = () => {
     descriptionAr: '',
     mainImage: '',
     colorOverlay: '#000000',
-    showOverlay: true // ✅ NEo
+    showOverlay: true,
+    titleColor: '#FFFFFF', // ✅ NEW
+    descriptionColor: '#FFFFFF', // ✅ NEW
   });
 
   // Add news ticker color state
@@ -84,12 +87,12 @@ const Settings: React.FC = () => {
     bannerTitleAr: '',
     bannerTextEn: '',
     bannerTextAr: '',
-    bannerColorOverlay: '#000000', // ✅ NEW: Default overlay color
-    showBannerOverlay: true, // ✅ NEW: Default overlay enabled
+    bannerColorOverlay: '#000000',
+    showBannerOverlay: true,
+    bannerTitleColor: '#FFFFFF', // ✅ NEW
+    bannerDescriptionColor: '#FFFFFF', // ✅ NEW
     displayOrder: 1,
     isActive: true,
-    showOnAdminDashboard: false, // ✅ NEW
-    selectedSectionsForAdmin: [], // ✅ Ensure this is always an array
     sections: [] as DynamicPageSection[]
   });
 
@@ -98,8 +101,24 @@ const Settings: React.FC = () => {
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
+  const [dashboardSections, setDashboardSections] = useState<DashboardSection[]>([]);
+  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [availableDynamicPages, setAvailableDynamicPages] = useState<DynamicPage[]>([]);
+
+  // Add these state variables after existing states (around line 100)
+  const [backupConfig, setBackupConfig] = useState<BackupConfig>({
+    frequency: 'weekly',
+    time: '02:00',
+    enabled: false,
+    collections: ['martyrs', 'wars', 'locations', 'villages', 'sectors', 'legends', 'activities', 'activityTypes', 'dynamicPages', 'news', 'users', 'martyrFriendStories', 'websiteSettings', 'notifications']
+  });
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+
   useEffect(() => {
     loadSettings();
+    loadDashboardSections();
+    loadAvailableDynamicPages();
+    loadBackupConfig();
   }, []);
 
   const loadSettings = async () => {
@@ -345,7 +364,9 @@ const Settings: React.FC = () => {
       descriptionAr: '',
       mainImage: '',
       colorOverlay: '#000000',
-      showOverlay: true // ✅ NEW
+      showOverlay: true, // ✅ NEW
+      titleColor: '#FFFFFF', // ✅ NEW: Title text color
+      descriptionColor: '#FFFFFF' // ✅ NEW: Description text color
     });
     setImagePreview('');
     setSelectedImageFile(null);
@@ -371,10 +392,11 @@ const Settings: React.FC = () => {
       descriptionAr: pageSettings.descriptionAr,
       mainImage: pageSettings.mainImage,
       colorOverlay: pageSettings.colorOverlay,
-      showOverlay: pageSettings.showOverlay ?? true // ✅ NEW
+      showOverlay: pageSettings.showOverlay ?? true,
+      titleColor: pageSettings.titleColor || '#FFFFFF', // ✅ Load saved or default
+      descriptionColor: pageSettings.descriptionColor || '#FFFFFF' // ✅ Load saved or default
     });
     setImagePreview(pageSettings.mainImage);
-    setSelectedImageFile(null);
     setEditingPage(pageId);
     setShowForm(true);
   };
@@ -504,18 +526,18 @@ const Settings: React.FC = () => {
       bannerTitleAr: '',
       bannerTextEn: '',
       bannerTextAr: '',
-      bannerColorOverlay: '#000000', // ✅ NEW: Default overlay color
-      showBannerOverlay: true, // ✅ NEW: Default overlay enabled
+      bannerColorOverlay: '#000000',
+      showBannerOverlay: true,
+      bannerTitleColor: '#FFFFFF', // ✅ NEW
+      bannerDescriptionColor: '#FFFFFF', // ✅ NEW
       displayOrder: 1,
       isActive: true,
-      showOnAdminDashboard: false, // ✅ NEW
-      selectedSectionsForAdmin: [], // ✅ NEW
-      sections: []
+      sections: [] as DynamicPageSection[]
     });
+    setBannerPreview('');
+    setSelectedBannerFile(null);
     setEditingDynamicPage(null);
     setShowDynamicPageForm(false);
-    setSelectedBannerFile(null);
-    setBannerPreview('');
   };
 
   // Add these functions after the existing dynamic page functions
@@ -626,6 +648,177 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('Error uploading media:', error);
       setError('Failed to upload media files');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDashboardSections = async () => {
+    try {
+      const sections = await websiteSettingsService.getDashboardSections();
+      setDashboardSections(sections.sort((a, b) => a.order - b.order));
+    } catch (error) {
+      console.error('Error loading dashboard sections:', error);
+    }
+  };
+
+  const loadAvailableDynamicPages = async () => {
+    try {
+      const pages = await dynamicPagesService.getActivePages();
+      setAvailableDynamicPages(pages);
+    } catch (error) {
+      console.error('Error loading dynamic pages:', error);
+    }
+  };
+
+  const addDashboardSection = (
+    type: 'fixed' | 'dynamicPage' | 'dynamicSection',
+    data: any
+  ) => {
+    const newOrder = dashboardSections.length > 0 
+      ? Math.max(...dashboardSections.map(s => s.order)) + 1 
+      : 1;
+      
+    let newSection: DashboardSection;
+    
+    if (type === 'fixed') {
+      newSection = {
+        id: `fixed_${data.id}_${Date.now()}`,
+        type: 'fixed',
+        label: data.label,
+        icon: data.icon,
+        order: newOrder,
+        isVisible: true,
+        fixedSectionId: data.id
+      };
+    } else if (type === 'dynamicPage') {
+      newSection = {
+        id: `page_${data.id}_${Date.now()}`,
+        type: 'dynamicPage',
+        label: data.titleEn,
+        icon: '📄',
+        order: newOrder,
+        isVisible: true,
+        dynamicPageId: data.id,
+        dynamicPageTitle: data.titleEn
+      };
+    } else {
+      newSection = {
+        id: `section_${data.sectionId}_${Date.now()}`,
+        type: 'dynamicSection',
+        label: `${data.pageTitle} - ${data.sectionTitle}`,
+        icon: '📑',
+        order: newOrder,
+        isVisible: true,
+        dynamicSectionId: data.sectionId,
+        dynamicSectionTitle: data.sectionTitle,
+        parentPageId: data.pageId,
+        parentPageTitle: data.pageTitle
+      };
+    }
+    
+    setDashboardSections([...dashboardSections, newSection]);
+    setShowAddSectionModal(false);
+  };
+
+  const removeDashboardSection = (id: string) => {
+    setDashboardSections(dashboardSections.filter(s => s.id !== id));
+  };
+
+  const toggleSectionVisibility = (id: string) => {
+    setDashboardSections(dashboardSections.map(s => 
+      s.id === id ? { ...s, isVisible: !s.isVisible } : s
+    ));
+  };
+
+  const moveSectionUp = (id: string) => {
+    const index = dashboardSections.findIndex(s => s.id === id);
+    if (index === 0) return;
+    
+    const newSections = [...dashboardSections];
+    [newSections[index - 1], newSections[index]] = [newSections[index], newSections[index - 1]];
+    
+    // Reassign orders
+    newSections.forEach((section, idx) => {
+      section.order = idx + 1;
+    });
+    
+    setDashboardSections(newSections);
+  };
+
+  const moveSectionDown = (id: string) => {
+    const index = dashboardSections.findIndex(s => s.id === id);
+    if (index === dashboardSections.length - 1) return;
+    
+    const newSections = [...dashboardSections];
+    [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
+    
+    // Reassign orders
+    newSections.forEach((section, idx) => {
+      section.order = idx + 1;
+    });
+    
+    setDashboardSections(newSections);
+  };
+
+  const saveDashboardSections = async () => {
+    if (!currentUser?.email) {
+      setError('User not authenticated');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await websiteSettingsService.updateDashboardSections(
+        dashboardSections,
+        currentUser.email,
+        currentUserData?.fullName
+      );
+      setSuccess('Dashboard sections order saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error saving dashboard sections:', error);
+      setError('Failed to save dashboard sections order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBackupConfig = async () => {
+    try {
+      const config = await backupService.getBackupConfig();
+      if (config) {
+        setBackupConfig(config);
+      }
+    } catch (error) {
+      console.error('Error loading backup config:', error);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      setDownloadingBackup(true);
+      setSuccess('📦 Creating backup... This may take a few minutes.');
+      await backupService.downloadBackup();
+      setSuccess('✅ Backup downloaded successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error downloading backup:', error);
+      setError('❌ Failed to download backup');
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const handleSaveBackupConfig = async () => {
+    try {
+      setLoading(true);
+      await backupService.saveBackupConfig(backupConfig);
+      setSuccess('✅ Backup schedule saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error saving backup config:', error);
+      setError('❌ Failed to save backup configuration');
     } finally {
       setLoading(false);
     }
@@ -915,83 +1108,559 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Section Order Settings */}
+      {/* Enhanced Dashboard Section Order */}
       <div className="settings-section">
         <h3>📋 Dashboard Section Order</h3>
-        <p>Control the order of sections on the main dashboard (after the banner)</p>
+        <p>Control what appears on the main dashboard and in what order (after the hero banner)</p>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-          <div className="form-group">
-            <label>🗺️ Interactive Map Position</label>
-            <select
-              value={sectionOrder.map}
-              onChange={(e) => setSectionOrder({...sectionOrder, map: parseInt(e.target.value)})}
-            >
-              <option value={1}>1st (First)</option>
-              <option value={2}>2nd (Second)</option>
-              <option value={3}>3rd (Third)</option>
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>👥 Martyrs Section Position</label>
-            <select
-              value={sectionOrder.martyrs}
-              onChange={(e) => setSectionOrder({...sectionOrder, martyrs: parseInt(e.target.value)})}
-            >
-              <option value={1}>1st (First)</option>
-              <option value={2}>2nd (Second)</option>
-              <option value={3}>3rd (Third)</option>
-            </select>
-          </div>
-          
-          <div className="form-group">
-            <label>📅 Activities Section Position</label>
-            <select
-              value={sectionOrder.activities}
-              onChange={(e) => setSectionOrder({...sectionOrder, activities: parseInt(e.target.value)})}
-            >
-              <option value={1}>1st (First)</option>
-              <option value={2}>2nd (Second)</option>
-              <option value={3}>3rd (Third)</option>
-            </select>
-          </div>
-        </div>
-        
-        <div className="form-group">
+        <div style={{ marginBottom: '20px' }}>
           <button 
             className="btn btn-primary"
-            onClick={saveSectionOrder}
-            disabled={loading}
+            onClick={() => setShowAddSectionModal(true)}
+            style={{ 
+              marginRight: '10px',
+              padding: '10px 20px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
           >
-            {loading ? 'Saving...' : '💾 Save Section Order'}
+            ➕ Add Section
+          </button>
+                <button 
+            className="btn btn-success"
+            onClick={saveDashboardSections}
+            disabled={loading}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: loading ? '#ccc' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            {loading ? 'Saving...' : '💾 Save Order'}
           </button>
         </div>
-        
-        <div style={{
-          background: 'var(--surface-color)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '8px',
-          padding: '15px',
-          marginTop: '10px'
+
+        {/* Dashboard Sections List */}
+        <div style={{ 
+                background: 'var(--surface-color)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+          padding: '20px' 
         }}>
-          <p style={{ margin: '5px 0', color: 'var(--text-primary)' }}>
-            <strong>Current Order Preview:</strong>
-          </p>
-          <ol style={{ margin: '8px 0 0 20px', color: 'var(--text-primary)' }}>
-            <li>🎯 Hero Banner (always first)</li>
-            {Object.entries(sectionOrder)
-              .sort(([,a], [,b]) => a - b)
-              .map(([section, position]) => (
-                <li key={section} style={{ margin: '3px 0', color: 'var(--text-primary)' }}>
-                  {section === 'map' && '🗺️ Interactive Map'}
-                  {section === 'martyrs' && '👥 Martyrs Section'}
-                  {section === 'activities' && '📅 Activities Section'}
-                </li>
-              ))}
-          </ol>
+          <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>Current Dashboard Layout:</h4>
+          <div style={{ marginTop: '10px' }}>
+            {/* Hero Banner - Always First */}
+                  <div style={{ 
+              padding: '15px', 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              borderRadius: '6px',
+              marginBottom: '12px',
+              fontWeight: '600',
+              fontSize: '15px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <strong>1. 🎯 Hero Banner</strong> <span style={{ fontSize: '13px', opacity: 0.9 }}>(Always First - Fixed)</span>
+              </div>
+
+            {dashboardSections.map((section, index) => (
+                          <div 
+                            key={section.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '15px',
+                  background: section.isVisible ? 'white' : '#f8f9fa',
+                  border: section.isVisible ? '2px solid #e9ecef' : '2px dashed #dee2e6',
+                  borderRadius: '6px',
+                  marginBottom: '10px',
+                  opacity: section.isVisible ? 1 : 0.7,
+                  transition: 'all 0.2s ease',
+                  boxShadow: section.isVisible ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <strong style={{ 
+                    fontSize: '16px', 
+                    color: '#495057',
+                    minWidth: '30px'
+                  }}>
+                    {section.order + 1}.
+                  </strong>
+                  <span style={{ fontSize: '20px' }}>{section.icon}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ 
+                      fontWeight: '500', 
+                      color: section.isVisible ? '#212529' : '#6c757d',
+                      fontSize: '15px'
+                    }}>
+                      {section.label}
+                    </span>
+                  {section.type === 'dynamicSection' && (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: '#6c757d',
+                        fontStyle: 'italic'
+                      }}>
+                        from {section.parentPageTitle}
+                    </span>
+                  )}
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => moveSectionUp(section.id)}
+                    disabled={index === 0}
+                    title="Move Up"
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: index === 0 ? '#e9ecef' : '#007bff',
+                      color: index === 0 ? '#6c757d' : 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: index === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (index !== 0) e.currentTarget.style.backgroundColor = '#0056b3';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (index !== 0) e.currentTarget.style.backgroundColor = '#007bff';
+                    }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveSectionDown(section.id)}
+                    disabled={index === dashboardSections.length - 1}
+                    title="Move Down"
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: index === dashboardSections.length - 1 ? '#e9ecef' : '#007bff',
+                      color: index === dashboardSections.length - 1 ? '#6c757d' : 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: index === dashboardSections.length - 1 ? 'not-allowed' : 'pointer',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (index !== dashboardSections.length - 1) e.currentTarget.style.backgroundColor = '#0056b3';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (index !== dashboardSections.length - 1) e.currentTarget.style.backgroundColor = '#007bff';
+                    }}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => toggleSectionVisibility(section.id)}
+                    title={section.isVisible ? "Hide" : "Show"}
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: section.isVisible ? '#ffc107' : '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
+                  >
+                    {section.isVisible ? 'HIDE' : 'SHOW'}
+                  </button>
+                  <button
+                    onClick={() => removeDashboardSection(section.id)}
+                    title="Remove"
+                    style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#c82333';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#dc3545';
+                    }}
+                  >
+                    DEL
+                  </button>
+                </div>
+              </div>
+            ))}
+            
+            {dashboardSections.length === 0 && (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 20px',
+                background: '#f8f9fa',
+                borderRadius: '6px',
+                border: '2px dashed #dee2e6'
+              }}>
+                <p style={{ 
+                  color: '#6c757d', 
+                  fontSize: '15px',
+                  margin: 0
+                }}>
+                  📋 No sections added yet. Click "Add Section" to get started.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Add Section Modal */}
+      {showAddSectionModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+          onClick={() => setShowAddSectionModal(false)}
+        >
+          <div 
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              maxWidth: '700px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '24px 30px',
+              borderBottom: '1px solid #e9ecef',
+              position: 'sticky',
+              top: 0,
+              background: 'white',
+              zIndex: 1,
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <h3 style={{ 
+                margin: 0, 
+                fontSize: '22px',
+                color: '#212529',
+                fontWeight: '600'
+              }}>
+                ➕ Add Dashboard Section
+              </h3>
+              <p style={{ 
+                margin: '8px 0 0 0', 
+                fontSize: '14px', 
+                color: '#6c757d' 
+              }}>
+                Choose content to display on the main dashboard
+              </p>
+            </div>
+            
+            {/* Modal Body */}
+            <div style={{ padding: '30px' }}>
+              {/* Fixed Sections */}
+              <div style={{ marginBottom: '30px' }}>
+                <h4 style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600',
+                  color: '#495057',
+                  marginBottom: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>🔧</span> Fixed Sections
+                </h4>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                {[
+                  { id: 'map', label: 'Interactive Map', icon: '🗺️' },
+                  { id: 'martyrs', label: 'Martyrs Section', icon: '👥' },
+                    { id: 'activities', label: 'Activities Section', icon: '📅' }
+                ].filter(fixed => !dashboardSections.some(s => s.fixedSectionId === fixed.id))
+                 .map(fixed => (
+                  <button
+                    key={fixed.id}
+                    onClick={() => addDashboardSection('fixed', fixed)}
+              style={{
+                        textAlign: 'left', 
+                        padding: '14px 18px',
+                        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                        border: '2px solid transparent',
+                borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        color: '#212529',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.border = '2px solid #007bff';
+                        e.currentTarget.style.transform = 'translateX(5px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.border = '2px solid transparent';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      <span style={{ fontSize: '20px' }}>{fixed.icon}</span>
+                      <span>{fixed.label}</span>
+                </button>
+                  ))}
+                  {[
+                    { id: 'map', label: 'Interactive Map', icon: '🗺️' },
+                    { id: 'martyrs', label: 'Martyrs Section', icon: '👥' },
+                    { id: 'activities', label: 'Activities Section', icon: '📅' }
+                  ].filter(fixed => !dashboardSections.some(s => s.fixedSectionId === fixed.id)).length === 0 && (
+                    <p style={{ 
+                      color: '#6c757d', 
+                      fontSize: '14px', 
+                      fontStyle: 'italic',
+                      margin: '10px 0'
+                    }}>
+                      All fixed sections have been added
+                    </p>
+                      )}
+                    </div>
+                </div>
+
+              {/* Dynamic Pages */}
+              <div style={{ marginBottom: '30px' }}>
+                <h4 style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600',
+                  color: '#495057',
+                  marginBottom: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>📄</span> Dynamic Pages (Full Page)
+                </h4>
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  {availableDynamicPages
+                    .filter(page => !dashboardSections.some(s => s.dynamicPageId === page.id))
+                    .map(page => (
+                  <button 
+                      key={page.id}
+                      onClick={() => addDashboardSection('dynamicPage', page)}
+                    style={{
+                        textAlign: 'left', 
+                        padding: '14px 18px',
+                        background: 'linear-gradient(135deg, #e0f7fa 0%, #80deea 100%)',
+                        border: '2px solid transparent',
+                      borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        color: '#212529',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.border = '2px solid #00acc1';
+                        e.currentTarget.style.transform = 'translateX(5px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.border = '2px solid transparent';
+                        e.currentTarget.style.transform = 'translateX(0)';
+                      }}
+                    >
+                      <span style={{ fontSize: '20px' }}>📄</span>
+                      <span>{page.titleEn}</span>
+                                </button>
+                  ))}
+                  {availableDynamicPages
+                    .filter(page => !dashboardSections.some(s => s.dynamicPageId === page.id)).length === 0 && (
+                    <p style={{ 
+                      color: '#6c757d', 
+                      fontSize: '14px', 
+                      fontStyle: 'italic',
+                      margin: '10px 0'
+                    }}>
+                      All dynamic pages have been added
+                    </p>
+                        )}
+                      </div>
+                  </div>
+              
+              {/* Dynamic Page Sections */}
+              <div>
+                <h4 style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600',
+                  color: '#495057',
+                  marginBottom: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '20px' }}>📑</span> Individual Page Sections
+                </h4>
+                <div style={{ display: 'grid', gap: '15px' }}>
+                  {availableDynamicPages.map(page => {
+                    const availableSections = page.sections.filter(
+                      section => !dashboardSections.some(s => s.dynamicSectionId === section.id)
+                    );
+                    
+                    if (availableSections.length === 0) return null;
+                    
+                    return (
+                      <div key={page.id} style={{
+                        background: '#f8f9fa',
+                        borderRadius: '8px',
+                        padding: '15px'
+                      }}>
+                        <strong style={{ 
+                          display: 'block', 
+                          marginBottom: '12px',
+                          fontSize: '14px',
+                          color: '#495057',
+                          fontWeight: '600'
+                        }}>
+                          📄 {page.titleEn}:
+                        </strong>
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                          {availableSections.map(section => (
+                            <button
+                            key={section.id}
+                              onClick={() => addDashboardSection('dynamicSection', {
+                                sectionId: section.id,
+                                sectionTitle: section.titleEn,
+                                pageId: page.id,
+                                pageTitle: page.titleEn
+                              })}
+                            style={{
+                                textAlign: 'left', 
+                                padding: '12px 16px',
+                                background: 'white',
+                                border: '2px solid transparent',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: '#212529',
+                                transition: 'all 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                                gap: '10px'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.border = '2px solid #28a745';
+                                e.currentTarget.style.transform = 'translateX(5px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.border = '2px solid transparent';
+                                e.currentTarget.style.transform = 'translateX(0)';
+                              }}
+                            >
+                              <span style={{ fontSize: '18px' }}>📑</span>
+                              <span>{section.titleEn}</span>
+                </button>
+                          ))}
+              </div>
+    </div>
+  );
+                  })}
+                  {availableDynamicPages.every(page => 
+                    page.sections.filter(section => 
+                      !dashboardSections.some(s => s.dynamicSectionId === section.id)
+                    ).length === 0
+                  ) && (
+                    <p style={{ 
+                      color: '#6c757d', 
+                      fontSize: '14px', 
+                      fontStyle: 'italic',
+                      margin: '10px 0',
+                      textAlign: 'center'
+                    }}>
+                      All individual sections have been added
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div style={{
+              padding: '20px 30px',
+              borderTop: '1px solid #e9ecef',
+              textAlign: 'right',
+              position: 'sticky',
+              bottom: 0,
+              background: 'white',
+              borderRadius: '0 0 12px 12px'
+            }}>
+              <button 
+                onClick={() => setShowAddSectionModal(false)}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#5a6268';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#6c757d';
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pages Grid */}
       <div className="settings-grid">
@@ -1220,6 +1889,140 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Add this after the "Show Overlay" checkbox section */}
+
+                {/* Text Color Settings */}
+                <div className="form-row" style={{ marginTop: '20px' }}>
+                  <div className="form-group">
+                    <label>Title Text Color</label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input
+                        type="color"
+                        value={formData.titleColor || '#FFFFFF'}
+                        onChange={(e) => handleInputChange('titleColor', e.target.value)}
+                        style={{
+                          width: '60px',
+                          height: '40px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={formData.titleColor || '#FFFFFF'}
+                        onChange={(e) => handleInputChange('titleColor', e.target.value)}
+                        placeholder="#FFFFFF"
+                        style={{
+                          padding: '8px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-color)',
+                          width: '120px'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('titleColor', '#FFFFFF')}
+                        style={{
+                          padding: '8px 12px',
+                          background: '#6c757d',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        Reset to White
+                      </button>
+                    </div>
+                    <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
+                      Color of the page title text (default: white)
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Description Text Color</label>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <input
+                        type="color"
+                        value={formData.descriptionColor || '#FFFFFF'}
+                        onChange={(e) => handleInputChange('descriptionColor', e.target.value)}
+                        style={{
+                          width: '60px',
+                          height: '40px',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={formData.descriptionColor || '#FFFFFF'}
+                        onChange={(e) => handleInputChange('descriptionColor', e.target.value)}
+                        placeholder="#FFFFFF"
+                        style={{
+                          padding: '8px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-color)',
+                          width: '120px'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('descriptionColor', '#FFFFFF')}
+                        style={{
+                          padding: '8px 12px',
+                          background: '#6c757d',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        Reset to White
+                      </button>
+                    </div>
+                    <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
+                      Color of the page description text (default: white)
+                    </small>
+                  </div>
+                </div>
+
+                {/* Live Preview */}
+                <div style={{
+                  marginTop: '20px',
+                  padding: '20px',
+                  background: formData.colorOverlay || '#000000',
+                  borderRadius: '8px',
+                  position: 'relative'
+                }}>
+                  <h3 style={{ 
+                    color: formData.titleColor || '#FFFFFF',
+                    margin: '0 0 10px 0',
+                    fontSize: '24px'
+                  }}>
+                    {formData.titleEn || 'Page Title'}
+                  </h3>
+                  <p style={{ 
+                    color: formData.descriptionColor || '#FFFFFF',
+                    margin: 0,
+                    fontSize: '16px'
+                  }}>
+                    {formData.descriptionEn || 'Page description will appear here'}
+                  </p>
+                  <small style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '10px',
+                    color: '#999',
+                    fontSize: '11px'
+                  }}>
+                    Live Preview
+                  </small>
+                </div>
+
                 {/* Form Actions */}
                 <div className="form-actions">
                   <button type="button" className="btn-secondary" onClick={closeForm}>
@@ -1295,17 +2098,6 @@ const Settings: React.FC = () => {
                       {page.showBannerOverlay ? '(ON)' : '(OFF)'}
                     </span>
                   </div>
-                  {/* ✅ NEW: Admin dashboard status */}
-                  <div style={{ marginTop: '5px' }}>
-                    <span>📊 Admin Dashboard: </span>
-                    {page.showOnAdminDashboard ? (
-                      <span style={{ color: 'green' }}>
-                        ✅ ON ({page.selectedSectionsForAdmin?.length || 0} sections)
-                      </span>
-                    ) : (
-                      <span style={{ color: 'red' }}>❌ OFF</span>
-                    )}
-                  </div>
                 </div>
               </div>
               
@@ -1313,7 +2105,11 @@ const Settings: React.FC = () => {
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => {
-                    setDynamicPageFormData(page);
+                    setDynamicPageFormData({
+                      ...page,
+                      bannerTitleColor: page.bannerTitleColor || '#FFFFFF', // ✅ NEW
+                      bannerDescriptionColor: page.bannerDescriptionColor || '#FFFFFF' // ✅ NEW
+                    });
                     setEditingDynamicPage(page);
                     setShowDynamicPageForm(true);
                   }}
@@ -1578,6 +2374,148 @@ const Settings: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* ✅ NEW: Banner Text Colors */}
+                <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+                  <h4 style={{ marginBottom: '15px', color: 'var(--text-primary)' }}>🎨 Banner Text Colors</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div className="form-group">
+                      <label>Banner Title Color</label>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={dynamicPageFormData.bannerTitleColor || '#FFFFFF'}
+                          onChange={(e) => setDynamicPageFormData(prev => ({ ...prev, bannerTitleColor: e.target.value }))}
+                          style={{
+                            width: '60px',
+                            height: '40px',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={dynamicPageFormData.bannerTitleColor || '#FFFFFF'}
+                          onChange={(e) => setDynamicPageFormData(prev => ({ ...prev, bannerTitleColor: e.target.value }))}
+                          placeholder="#FFFFFF"
+                          style={{
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            width: '120px'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDynamicPageFormData(prev => ({ ...prev, bannerTitleColor: '#FFFFFF' }))}
+                          style={{
+                            padding: '8px 12px',
+                            background: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
+                        Color of the banner title text
+                      </small>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Banner Description Color</label>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="color"
+                          value={dynamicPageFormData.bannerDescriptionColor || '#FFFFFF'}
+                          onChange={(e) => setDynamicPageFormData(prev => ({ ...prev, bannerDescriptionColor: e.target.value }))}
+                          style={{
+                            width: '60px',
+                            height: '40px',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={dynamicPageFormData.bannerDescriptionColor || '#FFFFFF'}
+                          onChange={(e) => setDynamicPageFormData(prev => ({ ...prev, bannerDescriptionColor: e.target.value }))}
+                          placeholder="#FFFFFF"
+                          style={{
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            width: '120px'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setDynamicPageFormData(prev => ({ ...prev, bannerDescriptionColor: '#FFFFFF' }))}
+                          style={{
+                            padding: '8px 12px',
+                            background: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
+                        Color of the banner description text
+                      </small>
+                    </div>
+                  </div>
+
+                  {/* Live Preview */}
+                  <div style={{
+                    marginTop: '20px',
+                    padding: '30px 20px',
+                    background: dynamicPageFormData.bannerColorOverlay || '#000000',
+                    borderRadius: '8px',
+                    position: 'relative',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <h3 style={{ 
+                      color: dynamicPageFormData.bannerTitleColor || '#FFFFFF',
+                      margin: '0 0 10px 0',
+                      fontSize: '28px',
+                      fontWeight: 'bold'
+                    }}>
+                      {dynamicPageFormData.bannerTitleEn || 'Banner Title'}
+                    </h3>
+                    <p style={{ 
+                      color: dynamicPageFormData.bannerDescriptionColor || '#FFFFFF',
+                      margin: 0,
+                      fontSize: '16px',
+                      lineHeight: '1.5'
+                    }}>
+                      {dynamicPageFormData.bannerTextEn || 'Banner description will appear here'}
+                    </p>
+                    <small style={{
+                      position: 'absolute',
+                      top: '5px',
+                      right: '10px',
+                      color: '#999',
+                      fontSize: '11px',
+                      background: 'rgba(255,255,255,0.9)',
+                      padding: '3px 8px',
+                      borderRadius: '3px'
+                    }}>
+                      Live Preview
+                    </small>
+                  </div>
+                </div>
               </div>
 
               {/* Sections Management */}
@@ -1750,140 +2688,6 @@ const Settings: React.FC = () => {
                 )}
               </div>
 
-              {/* Admin Dashboard Section Selection */}
-              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
-                <h3>📊 Admin Dashboard Sections</h3>
-                <p>Select which sections of this page should be displayed on the admin dashboard.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                  {dynamicPageFormData.sections.map((section, index) => (
-                    <label key={section.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input
-                        type="checkbox"
-                        checked={(dynamicPageFormData.selectedSectionsForAdmin || []).includes(section.id)} // ✅ Safe check
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const currentSelected = dynamicPageFormData.selectedSectionsForAdmin || []; // ✅ Safe fallback
-                          
-                          setDynamicPageFormData(prev => ({
-                            ...prev,
-                            selectedSectionsForAdmin: isChecked
-                              ? [...currentSelected, section.id]
-                              : currentSelected.filter(id => id !== section.id)
-                          }));
-                        }}
-                      />
-                      {section.titleEn || `Section ${index + 1}`}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* ✅ NEW: Admin Dashboard Display Section */}
-              <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
-                <h3>📊 Admin Dashboard Display</h3>
-                
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={dynamicPageFormData.showOnAdminDashboard}
-                      onChange={(e) => setDynamicPageFormData(prev => ({ ...prev, showOnAdminDashboard: e.target.checked }))}
-                    />
-                    📋 Show this page content on Admin Dashboard
-                  </label>
-                  <small style={{ color: 'var(--text-secondary)', marginTop: '5px', display: 'block' }}>
-                    When enabled, selected sections from this page will appear on the admin dashboard
-                  </small>
-                </div>
-
-                {dynamicPageFormData.showOnAdminDashboard && (
-                  <div className="form-group">
-                    <label>Select Sections to Show on Admin Dashboard:</label>
-                    <div style={{ 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: '6px', 
-                      padding: '15px',
-                      maxHeight: '300px',
-                      overflowY: 'auto'
-                    }}>
-                      {dynamicPageFormData.sections.length === 0 ? (
-                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
-                          No sections available. Add sections first.
-                        </p>
-                      ) : (
-                        dynamicPageFormData.sections.map((section, index) => (
-                          <div 
-                            key={section.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px',
-                              padding: '10px',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '4px',
-                              marginBottom: '10px',
-                              backgroundColor: (dynamicPageFormData.selectedSectionsForAdmin || []).includes(section.id) // ✅ Safe check
-                                ? 'rgba(59, 130, 246, 0.1)' 
-                                : 'var(--surface-color)'
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(dynamicPageFormData.selectedSectionsForAdmin || []).includes(section.id)} // ✅ Safe check
-                              onChange={(e) => {
-                                const isChecked = e.target.checked;
-                                const currentSelected = dynamicPageFormData.selectedSectionsForAdmin || []; // ✅ Safe fallback
-                                
-                                setDynamicPageFormData(prev => ({
-                                  ...prev,
-                                  selectedSectionsForAdmin: isChecked
-                                    ? [...currentSelected, section.id]
-                                    : currentSelected.filter(id => id !== section.id)
-                                }));
-                              }}
-                            />
-                            <div style={{ flex: 1 }}>
-                              <strong>Section {index + 1}: {section.titleEn || 'Untitled'}</strong>
-                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                Type: {section.type} | Arabic: {section.titleAr || 'No title'}
-                              </div>
-                              {section.type === 'text' && section.contentEn && (
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '5px' }}>
-                                  Preview: {section.contentEn.substring(0, 50)}...
-                                </div>
-                              )}
-                              {(section.type === 'photos' || section.type === 'videos') && section.media && (
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '5px' }}>
-                                  {section.media.length} {section.type === 'photos' ? 'images' : 'videos'}
-                                </div>
-                              )}
-                            </div>
-                            <span style={{ 
-                              fontSize: '14px',
-                              color: section.type === 'text' ? '#10b981' : section.type === 'photos' ? '#3b82f6' : '#ef4444'
-                            }}>
-                              {section.type === 'text' ? '📝' : section.type === 'photos' ? '📸' : '🎥'}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    
-                    {(dynamicPageFormData.selectedSectionsForAdmin || []).length > 0 && ( // ✅ Safe check
-                      <div style={{
-                        marginTop: '10px', 
-                        padding: '10px', 
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)', 
-                        borderRadius: '4px',
-                        fontSize: '14px'
-                      }}>
-                        ✅ {(dynamicPageFormData.selectedSectionsForAdmin || []).length} section(s) selected for admin dashboard
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
               {/* Form Actions */}
               <div className="form-actions" style={{ marginTop: '30px' }}>
                 <button type="button" className="btn btn-secondary" onClick={resetDynamicPageForm}>
@@ -1897,6 +2701,126 @@ const Settings: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Automated Backup Section */}
+      <div className="settings-section">
+        <h3>💾 Automated Backup System</h3>
+        <p>Schedule automatic backups of all system data</p>
+        
+        {/* Manual Backup Button */}
+        <div style={{ marginBottom: '30px' }}>
+          <button
+            className="btn btn-primary"
+            onClick={handleDownloadBackup}
+            disabled={downloadingBackup}
+            style={{
+              padding: '12px 24px',
+              fontSize: '16px',
+              backgroundColor: downloadingBackup ? '#ccc' : '#28a745',
+              cursor: downloadingBackup ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {downloadingBackup ? '📦 Creating Backup...' : '📥 Download Backup Now'}
+          </button>
+          <small style={{ display: 'block', marginTop: '10px', color: 'var(--text-secondary)' }}>
+            Creates an Excel file with all data from: Martyrs, Wars, Locations, Villages, Sectors, Legends, Activities, Activity Types, Dynamic Pages, News, Users, Stories, Settings, and Notifications
+          </small>
+        </div>
+
+        {/* Automated Schedule */}
+        <div style={{
+          background: 'var(--surface-color)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          padding: '20px',
+          marginTop: '20px'
+        }}>
+          <h4>⏰ Backup Schedule</h4>
+          
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={backupConfig.enabled}
+                onChange={(e) => setBackupConfig({ ...backupConfig, enabled: e.target.checked })}
+              />
+              <span style={{ marginLeft: '8px' }}>Enable Automated Backups</span>
+            </label>
+          </div>
+
+          {backupConfig.enabled && (
+            <>
+              <div className="form-group">
+                <label>Backup Frequency</label>
+                <select
+                  value={backupConfig.frequency}
+                  onChange={(e) => setBackupConfig({ ...backupConfig, frequency: e.target.value as any })}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    width: '100%',
+                    maxWidth: '300px'
+                  }}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly (Every Monday)</option>
+                  <option value="monthly">Monthly (1st of each month)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Backup Time (24-hour format)</label>
+                <input
+                  type="time"
+                  value={backupConfig.time}
+                  onChange={(e) => setBackupConfig({ ...backupConfig, time: e.target.value })}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    maxWidth: '200px'
+                  }}
+                />
+                <small style={{ display: 'block', marginTop: '5px', color: 'var(--text-secondary)' }}>
+                  Server timezone: UTC
+                </small>
+              </div>
+
+              {backupConfig.lastBackup && (
+                <div style={{
+                  padding: '15px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  borderRadius: '6px',
+                  marginTop: '15px'
+                }}>
+                  <strong>Last Backup:</strong> {new Date(backupConfig.lastBackup).toLocaleString()}
+                </div>
+              )}
+
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveBackupConfig}
+                disabled={loading}
+                style={{ marginTop: '15px' }}
+              >
+                {loading ? 'Saving...' : '💾 Save Backup Schedule'}
+              </button>
+            </>
+          )}
+
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            background: '#f8f9fa',
+            borderRadius: '6px',
+            fontSize: '14px'
+          }}>
+            <strong>ℹ️ Note:</strong> Automated backups require a backend cron job to be set up. 
+            Contact your system administrator to enable the scheduled backup service.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }; // This closes the Settings function

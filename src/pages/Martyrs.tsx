@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { martyrsService, type Martyr } from '../services/martyrsService';
 import { translationService } from '../services/translationService';
 import { generateMartyrQRCode, generatePrintQualityQRCode } from '../utils/qrCodeGenerator';
-import logoPath from '../assets/fv-logo-black.png'; // Use the existing black logo
+import logoPath from '../assets/balaghlogoqrcode.svg'; // Use the existing black logo
 import { useAuth } from '../context/AuthContext';
 import { warsService, type War } from '../services/warsService'; // Add this import
 

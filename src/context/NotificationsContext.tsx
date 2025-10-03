@@ -27,8 +27,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const { currentUser, currentUserData } = useAuth();
 
   useEffect(() => {
-    if (!currentUser?.email || !currentUserData) {
-      console.log('❌ No current user or user data, clearing notifications');
+    // Reset state when user logs out
+    if (!currentUser || !currentUserData) {
+      console.log('�� No user - clearing notifications');
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);
@@ -38,38 +39,43 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     console.log('🔔 Setting up notifications for user:', currentUser.email);
     setLoading(true);
 
-    // Subscribe to real-time notifications with better error handling
-    let unsubscribe: (() => void) | null = null;
-    
-    try {
-      unsubscribe = notificationsService.subscribeToNotifications(
-        currentUser.email,
-        currentUserData,
-        (newNotifications, newUnreadCount) => {
-          console.log('📬 Notifications updated:', {
-            total: newNotifications.length,
-            unread: newUnreadCount,
-            timestamp: new Date().toISOString()
-          });
-          
-          setNotifications(newNotifications);
-          setUnreadCount(newUnreadCount);
-          setLoading(false);
-        }
-      );
-    } catch (error) {
-      console.error('❌ Failed to set up notifications subscription:', error);
-      setLoading(false);
-    }
+    // ✅ Variable to store the unsubscribe function
+    let unsubscribe: (() => void) | undefined;
 
-    // Cleanup function
+    // ✅ Set up subscription (async)
+    const setupSubscription = async () => {
+      try {
+        unsubscribe = await notificationsService.subscribeToNotifications(
+          currentUser.email,
+          currentUserData,
+          (newNotifications, newUnreadCount) => {
+            console.log('📬 Notifications updated:', {
+              total: newNotifications.length,
+              unread: newUnreadCount,
+              timestamp: new Date().toISOString()
+            });
+            
+            setNotifications(newNotifications);
+            setUnreadCount(newUnreadCount);
+            setLoading(false);
+          }
+        );
+      } catch (error) {
+        console.error('❌ Failed to set up notifications subscription:', error);
+        setLoading(false);
+      }
+    };
+
+    setupSubscription();
+
+    // Cleanup subscription on unmount or user change
     return () => {
-      console.log('🧹 Cleaning up notifications subscription');
       if (unsubscribe && typeof unsubscribe === 'function') {
+        console.log('🔕 Cleaning up notifications subscription');
         unsubscribe();
       }
     };
-  }, [currentUser?.email, currentUserData?.role, currentUserData?.assignedVillageId]);
+  }, [currentUser, currentUserData]);
 
   const markAsRead = async (notificationId: string) => {
     if (currentUser?.email) {

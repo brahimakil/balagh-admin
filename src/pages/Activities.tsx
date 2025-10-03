@@ -20,6 +20,7 @@ const Activities: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [villages, setVillages] = useState<Village[]>([]);
+  const [activeTab, setActiveTab] = useState<'public' | 'private'>('private'); // ✅ Changed to 'private'
 
   // Form state
   const [formData, setFormData] = useState({
@@ -174,20 +175,28 @@ const Activities: React.FC = () => {
       // Show saving progress
       setSuccess('💾 Saving activity and sending notifications...');
       
-      const activityData = {
+      const activityData: any = {
         activityTypeId: formData.activityTypeId,
-        villageId: formData.villageId || undefined,
         nameEn: formData.nameEn,
         nameAr: formData.nameAr,
         descriptionEn: formData.descriptionEn,
         descriptionAr: formData.descriptionAr,
-        isPrivate: formData.isPrivate, // ✅ CRITICAL: Include isPrivate
-        isActive: calculateInitialActiveState(formData), // ✅ CALCULATE proper initial state
+        isPrivate: formData.isPrivate,
+        isActive: calculateInitialActiveState(formData),
         isManuallyReactivated: formData.isManuallyReactivated,
         date: new Date(formData.date + 'T' + formData.time),
         time: formData.time,
         durationHours: formData.durationHours,
       };
+      
+      // ✅ ALWAYS include villageId (empty string means "no village")
+      // When editing, we need to explicitly set it (even if empty) to trigger deletion
+      if (formData.villageId) {
+        activityData.villageId = formData.villageId;
+      } else {
+        // Set to empty string to signal removal (service will use deleteField)
+        activityData.villageId = '';
+      }
       
       console.log('💾 Saving activityData:', activityData);
       console.log('🔒 Saving isPrivate as:', activityData.isPrivate);
@@ -662,29 +671,56 @@ const Activities: React.FC = () => {
           <h1 className="page-title">📅 Activities Management</h1>
           <p className="page-subtitle">Manage and schedule activities</p>
         </div>
-        <div className="page-actions">
-          <div className="view-mode-toggle">
-            <button 
-              className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-            >
-              📋 List View
-            </button>
-            <button 
-              className={`view-mode-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-              onClick={() => setViewMode('calendar')}
-            >
-              📅 Calendar View
-            </button>
-          </div>
-          <button className="add-btn" onClick={() => setShowForm(true)}>
-            + Add Activity
-          </button>
+        <div className="stats-row">
+          <span className="stat-item">
+            Public: {activities.filter(a => !a.isPrivate).length}
+          </span>
+          <span className="stat-item">
+            Private: {activities.filter(a => a.isPrivate === true).length}
+          </span>
+          <span className="stat-item">Total: {activities.length}</span>
         </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
       {success && <div className="success-message">{success}</div>}
+
+      {/* ✅ NEW: Tab buttons */}
+      <div className="page-actions" style={{ marginBottom: '20px' }}>
+        <button 
+          className={activeTab === 'public' ? 'add-btn' : 'cancel-btn'}
+          onClick={() => setActiveTab('public')}
+        >
+          🌍 Public Activities ({activities.filter(a => !a.isPrivate).length})
+        </button>
+        <button 
+          className={activeTab === 'private' ? 'add-btn' : 'cancel-btn'}
+          onClick={() => setActiveTab('private')}
+        >
+          🔒 Private Activities ({activities.filter(a => a.isPrivate === true).length})
+        </button>
+      </div>
+
+      {/* Existing view mode toggle and add button */}
+      <div className="page-actions">
+        <div className="view-mode-toggle">
+          <button 
+            className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
+            onClick={() => setViewMode('list')}
+          >
+            📋 List View
+          </button>
+          <button 
+            className={`view-mode-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+            onClick={() => setViewMode('calendar')}
+          >
+            📅 Calendar View
+          </button>
+        </div>
+        <button className="add-btn" onClick={() => setShowForm(true)}>
+          + Add Activity
+        </button>
+      </div>
 
       {viewMode === 'calendar' && (
         <div className="calendar-container">
@@ -749,7 +785,9 @@ const Activities: React.FC = () => {
 
       {viewMode === 'list' && (
         <div className="martyrs-grid">
-          {activities.map((activity) => (
+          {activities
+            .filter(activity => activeTab === 'public' ? !activity.isPrivate : activity.isPrivate)
+            .map((activity) => (
             <div key={activity.id} className={`martyr-card ${!activity.isActive ? 'inactive' : ''}`}>
               <div className="martyr-image">
                 {activity.mainImage ? (
@@ -869,7 +907,7 @@ const Activities: React.FC = () => {
                     disabled={currentUserData?.role === 'village_editor'} // ✅ Disable for village_editor
                     required={currentUserData?.role !== 'main'} // Required for non-main admins
                   >
-                    <option value="">Select Village</option>
+                    <option value="">No Village (Public)</option>
                     {villages
                       .filter(village => {
                         // ✅ Show only assigned village for village_editor and village-assigned secondary
