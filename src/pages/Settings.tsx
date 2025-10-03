@@ -2797,28 +2797,37 @@ const Settings: React.FC = () => {
                   <strong>Last Backup:</strong> {new Date(backupConfig.lastBackup).toLocaleString()}
                 </div>
               )}
-
-              <button
-                className="btn btn-primary"
-                onClick={handleSaveBackupConfig}
-                disabled={loading}
-                style={{ marginTop: '15px' }}
-              >
-                {loading ? 'Saving...' : '💾 Save Backup Schedule'}
-              </button>
             </>
           )}
 
-          <div style={{
-            marginTop: '20px',
-            padding: '15px',
-            background: '#f8f9fa',
-            borderRadius: '6px',
-            fontSize: '14px'
-          }}>
-            <strong>ℹ️ Note:</strong> Automated backups require a backend cron job to be set up. 
-            Contact your system administrator to enable the scheduled backup service.
-          </div>
+          {/* Move save button OUTSIDE the conditional block */}
+          <button
+            className="btn btn-primary"
+            onClick={handleSaveBackupConfig}
+            disabled={loading}
+            style={{ marginTop: '15px' }}
+          >
+            {loading ? 'Saving...' : '💾 Save Backup Schedule'}
+          </button>
+
+          {backupConfig.enabled && (
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              background: '#e3f2fd',
+              borderRadius: '6px',
+              fontSize: '14px',
+              border: '1px solid #2196f3'
+            }}>
+              <strong>ℹ️ Automatic Backups Enabled</strong>
+              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#555' }}>
+                The system will remind you to download a backup {backupConfig.frequency === 'monthly' ? 'monthly' : backupConfig.frequency === 'weekly' ? 'weekly' : 'daily'}.
+                {backupConfig.lastBackup && (
+                  <> Last backup: {new Date(backupConfig.lastBackup).toLocaleDateString()}</>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
