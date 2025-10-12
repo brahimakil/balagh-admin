@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@types/leaflet": "^1.9.20",
+    "axios": "^1.12.2",
     "chart.js": "^4.5.0",
     "date-fns": "^4.1.0",
     "firebase": "^12.0.0",

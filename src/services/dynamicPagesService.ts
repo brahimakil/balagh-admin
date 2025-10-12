@@ -43,11 +43,14 @@ export interface DynamicPage {
   bannerTextAr: string;
   bannerColorOverlay: string;
   showBannerOverlay: boolean;
-  bannerTitleColor?: string; // ✅ NEW: Banner title text color
-  bannerDescriptionColor?: string; // ✅ NEW: Banner description text color
+  bannerTitleColor?: string;
+  bannerDescriptionColor?: string;
   sections: DynamicPageSection[];
   isActive: boolean;
   displayOrder: number;
+  // ✅ NEW FIELDS for category feature
+  displayInHeader: boolean; // If true, show directly in header; if false, show in category
+  categoryId?: string; // Category this page belongs to (only if displayInHeader is false)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -71,6 +74,40 @@ export const dynamicPagesService = {
   async getActivePages(): Promise<DynamicPage[]> {
     const q = query(
       collection(db, COLLECTION_NAME), 
+      where('isActive', '==', true),
+      orderBy('displayOrder', 'asc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate(),
+    })) as DynamicPage[];
+  },
+
+  // ✅ NEW: Get pages by category
+  async getPagesByCategory(categoryId: string): Promise<DynamicPage[]> {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('categoryId', '==', categoryId),
+      where('isActive', '==', true),
+      orderBy('displayOrder', 'asc')
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate(),
+    })) as DynamicPage[];
+  },
+
+  // ✅ NEW: Get pages that display directly in header
+  async getHeaderPages(): Promise<DynamicPage[]> {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('displayInHeader', '==', true),
       where('isActive', '==', true),
       orderBy('displayOrder', 'asc')
     );

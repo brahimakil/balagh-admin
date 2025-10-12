@@ -423,7 +423,7 @@ const Sectors: React.FC = () => {
                   {formData.locationIds.length > 0 && (
                     <span className="ml-[10px] text-xs text-gray-500 dark:text-gray-400">
                       <span className="mr-[10px]">
-                        �� Before: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}
+                        🌅 Before: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'before_dohor').length}
                       </span>
                       <span className="mr-[10px]">
                         🌇 After: {formData.locationPrayerTimings.filter(t => t.prayerTiming === 'after_dohor').length}

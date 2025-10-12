@@ -107,7 +107,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: '📰',
       permission: 'news',
       children: [
-        { id: 'live-news', label: 'Live News', icon: '🔴', permission: 'liveNews' }
+        { id: 'live-news', label: 'Live News', icon: '🔴', permission: 'news' },
+        { id: 'press-news', label: 'Press News', icon: '📄', permission: 'news' }
       ]
     },
     { 

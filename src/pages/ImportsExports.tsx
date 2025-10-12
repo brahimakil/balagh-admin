@@ -8,6 +8,8 @@ import { legendsService } from '../services/legendsService';
 import { activitiesService } from '../services/activitiesService';
 import { activityTypesService } from '../services/activityTypesService';
 import * as XLSX from 'xlsx';
+import { importService } from '../services/importService';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where, Timestamp } from 'firebase/firestore';
 
 const ImportsExports: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
@@ -18,6 +20,15 @@ const ImportsExports: React.FC = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importDataType, setImportDataType] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [importAllFile, setImportAllFile] = useState<File | null>(null);
+  const [importAllResults, setImportAllResults] = useState<{
+    results: Array<{collection: string, result: any}>,
+    totalImported: number,
+    totalSkipped: number,
+    totalErrors: number,
+    newColumns?: Array<{collection: string, columns: string[]}>
+  } | null>(null);
 
   const clearMessages = () => {
     setSuccess('');
@@ -358,20 +369,38 @@ const ImportsExports: React.FC = () => {
 
           if (jsonData.length === 0) {
             setError('The Excel file is empty or has no data');
+            setLoading(null);
             return;
           }
 
-          console.log('Imported data:', jsonData);
+          console.log('📊 Importing data:', jsonData);
           
-          // Here you would process and save the data based on importDataType
-          // For now, just show success with count
-          setSuccess(`Successfully imported ${jsonData.length} ${importDataType} records. (Processing logic to be implemented)`);
+          // ✅ Use the new import service
+          const result = await importService.importData(importDataType, jsonData);
           
-          // Reset form
-          setImportFile(null);
-          setImportDataType('');
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+          if (result.success) {
+            setSuccess(`✅ Import completed successfully!\n${result.details}`);
+          } else {
+            let errorMsg = `⚠️ Import completed with errors:\n${result.details}\n\n`;
+            if (result.errors.length > 0) {
+              errorMsg += 'Errors:\n';
+              result.errors.slice(0, 10).forEach(err => {
+                errorMsg += `• Row ${err.row}: ${err.message}\n`;
+              });
+              if (result.errors.length > 10) {
+                errorMsg += `... and ${result.errors.length - 10} more errors`;
+              }
+            }
+            setError(errorMsg);
+          }
+          
+          // Reset form only if completely successful
+          if (result.success) {
+            setImportFile(null);
+            setImportDataType('');
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
           }
 
         } catch (parseError: any) {
@@ -391,6 +420,80 @@ const ImportsExports: React.FC = () => {
     } catch (error: any) {
       console.error('Error importing data:', error);
       setError(`Failed to import data: ${error.message}`);
+      setLoading(null);
+    }
+  };
+
+  const importAllFromExcel = async () => {
+    if (!importAllFile) {
+      setError('Please select an Excel file to import');
+      return;
+    }
+
+    try {
+      setLoading('import-all');
+      clearMessages();
+      setImportAllResults(null);
+
+      // Read the Excel file
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          console.log('📚 Workbook sheets:', workbook.SheetNames);
+
+          // ✅ Check for new/changed columns before import
+          const newColumnsDetected = await importService.detectNewColumns(workbook);
+
+          // Use the new import all service
+          const result = await importService.importAllFromWorkbook(workbook);
+
+          // ✅ Convert Map to Array for React state
+          const resultsArray = Array.from(result.results.entries()).map(([collection, res]) => ({
+            collection,
+            result: res
+          }));
+
+          setImportAllResults({
+            results: resultsArray,
+            totalImported: result.totalImported,
+            totalSkipped: result.totalSkipped,
+            totalErrors: result.totalErrors,
+            newColumns: newColumnsDetected.length > 0 ? newColumnsDetected : undefined
+          });
+
+          if (result.success) {
+            let successMsg = `✅ Import All completed successfully!\nTotal: ${result.totalImported} imported, ${result.totalSkipped} skipped`;
+            if (newColumnsDetected.length > 0) {
+              successMsg += `\n\n⚠️ Warning: ${newColumnsDetected.length} collection(s) have new/unknown columns that were ignored.`;
+            }
+            setSuccess(successMsg);
+          } else {
+            setError(`⚠️ Import All completed with some errors.\nTotal: ${result.totalImported} imported, ${result.totalSkipped} skipped, ${result.totalErrors} errors`);
+          }
+
+          // Reset file input
+          setImportAllFile(null);
+
+        } catch (parseError: any) {
+          setError(`Failed to parse Excel file: ${parseError.message}`);
+        } finally {
+          setLoading(null);
+        }
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read the selected file');
+        setLoading(null);
+      };
+
+      reader.readAsArrayBuffer(importAllFile);
+
+    } catch (error: any) {
+      console.error('Error initiating multi-collection import:', error);
+      setError(`Failed to initiate multi-collection import: ${error.message}`);
       setLoading(null);
     }
   };
@@ -579,6 +682,182 @@ const ImportsExports: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Import All Section */}
+      <div className="import-sections" style={{ marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '40px' }}>
+        <div className="section-header">
+          <h2>📦 Import All Data</h2>
+          <p>Import from a multi-sheet Excel workbook (like the one exported from "Download Backup")</p>
+        </div>
+
+        <div className="import-container">
+          <div className="import-form">
+            <div className="form-group">
+              <label>Select Multi-Sheet Excel File:</label>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setImportAllFile(e.target.files?.[0] || null)}
+                className="file-input"
+              />
+            </div>
+
+            <button 
+              className="import-btn"
+              onClick={importAllFromExcel}
+              disabled={!importAllFile || loading === 'import-all'}
+              style={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                fontSize: '16px',
+                padding: '15px 30px'
+              }}
+            >
+              {loading === 'import-all' ? (
+                <>⏳ Importing All Collections...</>
+              ) : (
+                <>📦 Import All Data</>
+              )}
+            </button>
+          </div>
+
+          <div className="column-requirements">
+            <h3>📋 About Multi-Sheet Import</h3>
+            <div className="import-notes">
+              <h4>✨ Features:</h4>
+              <ul>
+                <li>✅ Automatically detects and imports all collections from sheets</li>
+                <li>✅ Imports in correct order (dependencies first)</li>
+                <li>✅ Validates all relationships before importing</li>
+                <li>✅ Skips duplicate records automatically</li>
+                <li>✅ Shows detailed progress for each collection</li>
+                <li>✅ Rolls back if critical errors occur</li>
+              </ul>
+              
+              <h4>📝 How to use:</h4>
+              <ol>
+                <li>Export your data using "Download Backup Now" button</li>
+                <li>Edit the Excel file (add/modify data in any sheet)</li>
+                <li>Upload the file here to import all changes</li>
+              </ol>
+              
+              <h4>⚠️ Important:</h4>
+              <ul>
+                <li>Do NOT change column names in the Excel sheets</li>
+                <li>For relationships (War ID, Location ID, etc.), use existing IDs from the system</li>
+                <li>Leave media URL columns as-is (they will be preserved)</li>
+                <li>The system will auto-generate new IDs for new records</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Import Progress/Results */}
+        {importAllResults && (
+          <div style={{ marginTop: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px' }}>
+            <h3>📊 Import Results</h3>
+            
+            {/* ✅ Show new columns warning if detected */}
+            {importAllResults.newColumns && importAllResults.newColumns.length > 0 && (
+              <div style={{ 
+                padding: '15px', 
+                background: '#fff3cd', 
+                border: '2px solid #ffc107', 
+                borderRadius: '8px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ margin: '0 0 10px 0' }}>⚠️ New/Unknown Columns Detected</h4>
+                <p style={{ margin: '0 0 10px 0', fontSize: '14px' }}>
+                  The following collections have columns that don't match the expected format. These columns were ignored during import:
+                </p>
+                {importAllResults.newColumns.map(({ collection, columns }) => (
+                  <div key={collection} style={{ marginBottom: '10px' }}>
+                    <strong style={{ textTransform: 'capitalize' }}>{collection}:</strong>
+                    <ul style={{ margin: '5px 0 0 20px', fontSize: '13px' }}>
+                      {columns.map(col => (
+                        <li key={col}>{col}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                <p style={{ margin: '10px 0 0 0', fontSize: '13px', fontStyle: 'italic' }}>
+                  💡 Tip: These columns will be skipped. If they're important, update the import schema in the code.
+                </p>
+              </div>
+            )}
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginTop: '20px' }}>
+              {importAllResults.results.map(({ collection, result }) => (
+                <div 
+                  key={collection}
+                  style={{
+                    padding: '15px',
+                    background: result.success ? '#d4edda' : result.errors.length > 0 ? '#f8d7da' : '#fff3cd',
+                    border: `2px solid ${result.success ? '#28a745' : result.errors.length > 0 ? '#dc3545' : '#ffc107'}`,
+                    borderRadius: '8px'
+                  }}
+                >
+                  <h4 style={{ margin: '0 0 10px 0', textTransform: 'capitalize' }}>
+                    {result.success ? '✅' : result.errors.length > 0 ? '❌' : '⚠️'} {collection}
+                  </h4>
+                  <div style={{ fontSize: '14px' }}>
+                    <div>✅ Imported: <strong>{result.imported}</strong></div>
+                    <div>⏭️  Skipped: <strong>{result.skipped}</strong></div>
+                    <div>❌ Errors: <strong>{result.errors.length}</strong></div>
+                  </div>
+                  {result.errors.length > 0 && (
+                    <details style={{ marginTop: '10px', fontSize: '12px' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+                        View Errors ({result.errors.length})
+                      </summary>
+                      <ul style={{ margin: '10px 0 0 0', paddingLeft: '20px' }}>
+                        {result.errors.slice(0, 5).map((err: any, idx: number) => (
+                          <li key={idx}>Row {err.row}: {err.message}</li>
+                        ))}
+                        {result.errors.length > 5 && (
+                          <li>... and {result.errors.length - 5} more</li>
+                        )}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div style={{ 
+              marginTop: '20px', 
+              padding: '15px', 
+              background: '#007bff', 
+              color: 'white', 
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}>
+              📊 Total: {importAllResults.totalImported} imported, 
+              {' '}{importAllResults.totalSkipped} skipped, 
+              {' '}{importAllResults.totalErrors} errors
+            </div>
+          </div>
+        )}
+      </div>
+
+      <button 
+        onClick={async () => {
+          if (window.confirm('⚠️ This will delete ALL imported records (with importSource=excel). Continue?')) {
+            setLoading('cleanup');
+            try {
+              const result = await importService.deleteAllImportedRecords();
+              setSuccess(`✅ Deleted ${result.deleted} imported records`);
+            } catch (error: any) {
+              setError(`❌ Cleanup failed: ${error.message}`);
+            } finally {
+              setLoading(null);
+            }
+          }
+        }}
+        style={{ background: '#dc3545', color: 'white', padding: '10px 20px', borderRadius: '6px', border: 'none', cursor: 'pointer', marginTop: '20px' }}
+      >
+        🗑️ Emergency: Delete All Imported Records
+      </button>
     </div>
   );
 };

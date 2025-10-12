@@ -555,7 +555,7 @@ export const websiteSettingsService = {
           id: 'fixed_map',
           type: 'fixed',
           label: 'Interactive Map',
-          icon: '��️',
+          icon: '🗺️',
           order: oldOrder.map,
           isVisible: true,
           fixedSectionId: 'map'
@@ -564,7 +564,7 @@ export const websiteSettingsService = {
           id: 'fixed_martyrs',
           type: 'fixed',
           label: 'Martyrs Section',
-          icon: '��',
+          icon: '👥',
           order: oldOrder.martyrs,
           isVisible: true,
           fixedSectionId: 'martyrs'
@@ -573,7 +573,7 @@ export const websiteSettingsService = {
           id: 'fixed_activities',
           type: 'fixed',
           label: 'Activities Section',
-          icon: '��',
+          icon: '📅',
           order: oldOrder.activities,
           isVisible: true,
           fixedSectionId: 'activities'
@@ -613,7 +613,7 @@ const getDefaultSettings = (): WebsiteSettings => ({
       id: 'fixed_map',
       type: 'fixed',
       label: 'Interactive Map',
-      icon: '��️',
+      icon: '🗺️',
       order: 1,
       isVisible: true,
       fixedSectionId: 'map'
@@ -622,7 +622,7 @@ const getDefaultSettings = (): WebsiteSettings => ({
       id: 'fixed_martyrs',
       type: 'fixed',
       label: 'Martyrs Section',
-      icon: '��',
+      icon: '👥',
       order: 2,
       isVisible: true,
       fixedSectionId: 'martyrs'
@@ -631,7 +631,7 @@ const getDefaultSettings = (): WebsiteSettings => ({
       id: 'fixed_activities',
       type: 'fixed',
       label: 'Activities Section',
-      icon: '��',
+      icon: '📅',
       order: 3,
       isVisible: true,
       fixedSectionId: 'activities'

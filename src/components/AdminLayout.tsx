@@ -23,6 +23,7 @@ import Villages from '../pages/Villages';
 import ImportsExports from '../pages/ImportsExports';
 import SimpleWhatsApp from '../pages/SimpleWhatsApp';
 import Sectors from '../pages/Sectors';
+import PressNews from '../pages/PressNews';
 
 
 const AdminLayout: React.FC = () => {
@@ -52,6 +53,7 @@ const AdminLayout: React.FC = () => {
       'activity-types': 'Activity Types Management',
       'news': 'News Management',
       'live-news': 'Live News Management',
+      'press-news': 'Press News Management',
       'notifications': 'Notifications',
       'martyrs-stories': 'Martyrs Stories Management',
       'admins': 'Admins Management',
@@ -75,7 +77,8 @@ const AdminLayout: React.FC = () => {
         'activities': 'activities',
         'activity-types': 'activityTypes',
         'news': 'news',
-        'live-news': 'liveNews',
+        'live-news': 'news',
+        'press-news': 'news',
         'notifications': 'notifications',
         'admins': 'admins',
         'settings': 'settings',
@@ -156,7 +159,8 @@ const AdminLayout: React.FC = () => {
         'activities': 'activities',
         'activity-types': 'activityTypes',
         'news': 'news',
-        'live-news': 'liveNews',
+        'live-news': 'news',
+        'press-news': 'news',
         'notifications': 'notifications',
         'admins': 'admins',
         'settings': 'settings',
@@ -201,6 +205,7 @@ const AdminLayout: React.FC = () => {
             <Route path="activity-types" element={<ActivityTypes />} />
             <Route path="news" element={<News />} />
             <Route path="live-news" element={<LiveNews />} />
+            <Route path="press-news" element={<PressNews />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="legends" element={<Legends />} />
             <Route path="admins" element={<Admins />} />

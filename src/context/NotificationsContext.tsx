@@ -29,7 +29,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     // Reset state when user logs out
     if (!currentUser || !currentUserData) {
-      console.log('�� No user - clearing notifications');
+      console.log('🔔 No user - clearing notifications');
       setNotifications([]);
       setUnreadCount(0);
       setLoading(false);

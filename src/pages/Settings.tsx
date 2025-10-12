@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { websiteSettingsService, type PageSettings, type WebsiteSettings, type DashboardSection } from '../services/websiteSettingsService';
-import { translationService } from '../services/translationService';
+import { translationService} from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
 import { dynamicPagesService, type DynamicPage, type DynamicPageSection } from '../services/dynamicPagesService';
 import { fileUploadService } from '../services/fileUploadService';
 import { backupService, type BackupConfig } from '../services/backupService';
+import { pageCategoriesService, type PageCategory } from '../services/pageCategoriesService';
 
 const Settings: React.FC = () => {
   const { currentUser, currentUserData } = useAuth();
@@ -93,7 +94,9 @@ const Settings: React.FC = () => {
     bannerDescriptionColor: '#FFFFFF', // ✅ NEW
     displayOrder: 1,
     isActive: true,
-    sections: [] as DynamicPageSection[]
+    sections: [] as DynamicPageSection[],
+    displayInHeader: true,  // ✅ ADD THIS
+    categoryId: '',         // ✅ ADD THIS
   });
 
   // Add these new state variables for file uploads
@@ -106,19 +109,26 @@ const Settings: React.FC = () => {
   const [availableDynamicPages, setAvailableDynamicPages] = useState<DynamicPage[]>([]);
 
   // Add these state variables after existing states (around line 100)
-  const [backupConfig, setBackupConfig] = useState<BackupConfig>({
-    frequency: 'weekly',
-    time: '02:00',
-    enabled: false,
-    collections: ['martyrs', 'wars', 'locations', 'villages', 'sectors', 'legends', 'activities', 'activityTypes', 'dynamicPages', 'news', 'users', 'martyrFriendStories', 'websiteSettings', 'notifications']
-  });
   const [downloadingBackup, setDownloadingBackup] = useState(false);
+
+  // Add to state variables (around line 75, after dynamicPages state):
+  const [pageCategories, setPageCategories] = useState<PageCategory[]>([]);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<PageCategory | null>(null);
+  const [categoryFormData, setCategoryFormData] = useState({
+    nameEn: '',
+    nameAr: '',
+    descriptionEn: '',
+    descriptionAr: '',
+    displayOrder: 0,
+    isActive: true,
+  });
 
   useEffect(() => {
     loadSettings();
     loadDashboardSections();
     loadAvailableDynamicPages();
-    loadBackupConfig();
+    loadPageCategories(); // ✅ ADD THIS
   }, []);
 
   const loadSettings = async () => {
@@ -532,7 +542,9 @@ const Settings: React.FC = () => {
       bannerDescriptionColor: '#FFFFFF', // ✅ NEW
       displayOrder: 1,
       isActive: true,
-      sections: [] as DynamicPageSection[]
+      sections: [] as DynamicPageSection[],
+      displayInHeader: true,  // ✅ ADD THIS
+      categoryId: '',         // ✅ ADD THIS
     });
     setBannerPreview('');
     setSelectedBannerFile(null);
@@ -784,17 +796,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  const loadBackupConfig = async () => {
-    try {
-      const config = await backupService.getBackupConfig();
-      if (config) {
-        setBackupConfig(config);
-      }
-    } catch (error) {
-      console.error('Error loading backup config:', error);
-    }
-  };
-
   const handleDownloadBackup = async () => {
     try {
       setDownloadingBackup(true);
@@ -810,18 +811,84 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleSaveBackupConfig = async () => {
+  const loadPageCategories = async () => {
+    try {
+      const categories = await pageCategoriesService.getAllCategories();
+      setPageCategories(categories);
+    } catch (error) {
+      console.error('Error loading page categories:', error);
+      setError('Failed to load page categories');
+    }
+  };
+
+  const handleCategoryFormChange = (field: string, value: any) => {
+    setCategoryFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
       setLoading(true);
-      await backupService.saveBackupConfig(backupConfig);
-      setSuccess('✅ Backup schedule saved successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      
+      if (editingCategory) {
+        await pageCategoriesService.updateCategory(editingCategory.id!, categoryFormData);
+        setSuccess('✅ Category updated successfully!');
+      } else {
+        await pageCategoriesService.createCategory(categoryFormData);
+        setSuccess('✅ Category created successfully!');
+      }
+      
+      await loadPageCategories();
+      resetCategoryForm();
     } catch (error) {
-      console.error('Error saving backup config:', error);
-      setError('❌ Failed to save backup configuration');
+      console.error('Error saving category:', error);
+      setError('Failed to save category');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditCategory = (category: PageCategory) => {
+    setEditingCategory(category);
+    setCategoryFormData({
+      nameEn: category.nameEn,
+      nameAr: category.nameAr,
+      descriptionEn: category.descriptionEn || '',
+      descriptionAr: category.descriptionAr || '',
+      displayOrder: category.displayOrder,
+      isActive: category.isActive,
+    });
+    setShowCategoryForm(true);
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete "${name}"? Pages in this category will become uncategorized.`)) {
+      try {
+        await pageCategoriesService.deleteCategory(id);
+        setSuccess('✅ Category deleted successfully!');
+        await loadPageCategories();
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        setError('Failed to delete category');
+      }
+    }
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      nameEn: '',
+      nameAr: '',
+      descriptionEn: '',
+      descriptionAr: '',
+      displayOrder: pageCategories.length,
+      isActive: true,
+    });
+    setEditingCategory(null);
+    setShowCategoryForm(false);
   };
 
   if (loading && !settings) {
@@ -2252,6 +2319,153 @@ const Settings: React.FC = () => {
                 </div>
               </div>
 
+              
+                {/* ✅ NEW: Category Selection Section */}
+                <div style={{ 
+                  marginTop: '20px', 
+                  padding: '20px', 
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1))', 
+                  borderRadius: '12px', 
+                  border: '2px solid rgba(59, 130, 246, 0.3)' 
+                }}>
+                  <h4 style={{ margin: '0 0 15px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📁 Display Location
+                  </h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    {/* Radio buttons */}
+                    <div>
+                      <label style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        padding: '15px', 
+                        background: dynamicPageFormData.displayInHeader ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.5)',
+                        borderRadius: '8px',
+                        border: dynamicPageFormData.displayInHeader ? '2px solid #3b82f6' : '2px solid transparent',
+                        cursor: 'pointer',
+                        marginBottom: '10px',
+                        transition: 'all 0.2s'
+                      }}>
+                        <input
+                          type="radio"
+                          name="displayLocation"
+                          checked={dynamicPageFormData.displayInHeader === true}
+                          onChange={() => {
+                            setDynamicPageFormData(prev => ({
+                              ...prev,
+                              displayInHeader: true,
+                              categoryId: ''
+                            }));
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>🔗 Show directly in header</div>
+                          <small style={{ color: 'var(--text-secondary)' }}>Page appears as a standalone link</small>
+                        </div>
+                      </label>
+                      
+                      <label style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        padding: '15px', 
+                        background: !dynamicPageFormData.displayInHeader ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.5)',
+                        borderRadius: '8px',
+                        border: !dynamicPageFormData.displayInHeader ? '2px solid #3b82f6' : '2px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}>
+                        <input
+                          type="radio"
+                          name="displayLocation"
+                          checked={dynamicPageFormData.displayInHeader === false}
+                          onChange={() => {
+                            setDynamicPageFormData(prev => ({
+                              ...prev,
+                              displayInHeader: false
+                            }));
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 'bold' }}>📂 Show inside a category</div>
+                          <small style={{ color: 'var(--text-secondary)' }}>Page appears in a dropdown menu</small>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Category dropdown */}
+                    <div>
+                      <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>
+                        Select Category {!dynamicPageFormData.displayInHeader && <span style={{ color: 'red' }}>*</span>}
+                      </label>
+                      <select
+                        value={dynamicPageFormData.categoryId || ''}
+                        onChange={(e) => setDynamicPageFormData(prev => ({
+                          ...prev,
+                          categoryId: e.target.value
+                        }))}
+                        disabled={dynamicPageFormData.displayInHeader}
+                        required={!dynamicPageFormData.displayInHeader}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          border: '2px solid var(--border-color)',
+                          backgroundColor: dynamicPageFormData.displayInHeader ? '#f5f5f5' : 'var(--surface-color)',
+                          cursor: dynamicPageFormData.displayInHeader ? 'not-allowed' : 'pointer',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">-- Select a Category --</option>
+                        {pageCategories.filter(cat => cat.isActive).map(category => (
+                          <option key={category.id} value={category.id}>
+                            📁 {category.nameEn} - {category.nameAr}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* Helper messages */}
+                      <div style={{ marginTop: '10px' }}>
+                        {pageCategories.filter(cat => cat.isActive).length === 0 && (
+                          <div style={{ 
+                            padding: '10px', 
+                            background: '#fff3cd', 
+                            border: '1px solid #ffc107', 
+                            borderRadius: '6px',
+                            fontSize: '13px'
+                          }}>
+                            ⚠️ No categories available. Create a category first in the "Page Categories Management" section above.
+                          </div>
+                        )}
+                        {dynamicPageFormData.displayInHeader && (
+                          <div style={{ 
+                            padding: '10px', 
+                            background: '#d1ecf1', 
+                            border: '1px solid #17a2b8', 
+                            borderRadius: '6px',
+                            fontSize: '13px'
+                          }}>
+                            💡 This page will appear directly in the header menu
+                          </div>
+                        )}
+                        {!dynamicPageFormData.displayInHeader && dynamicPageFormData.categoryId && (
+                          <div style={{ 
+                            padding: '10px', 
+                            background: '#d4edda', 
+                            border: '1px solid #28a745', 
+                            borderRadius: '6px',
+                            fontSize: '13px'
+                          }}>
+                            ✅ Page will appear in the "{pageCategories.find(c => c.id === dynamicPageFormData.categoryId)?.nameEn}" category dropdown
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            
+
               {/* Banner Section */}
               <div className="form-section" style={{ marginTop: '30px', background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
                 <h3>🎯 Page Banner</h3>
@@ -2612,64 +2826,91 @@ const Settings: React.FC = () => {
 
                     {/* Media Section Content */}
                     {(section.type === 'photos' || section.type === 'videos') && (
-                      <div className="form-group">
-                        <label>Upload {section.type === 'photos' ? 'Images' : 'Videos'}</label>
-                        <input
-                          type="file"
-                          multiple
-                          accept={section.type === 'photos' ? 'image/*' : 'video/*'}
-                          onChange={(e) => {
-                            if (e.target.files) {
-                              handleSectionMediaUpload(section.id, e.target.files);
-                            }
-                          }}
-                        />
-                        
-                        {/* Show uploaded media */}
-                        {section.media && section.media.length > 0 && (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '10px' }}>
-                            {section.media.map((media, mediaIndex) => (
-                              <div key={mediaIndex} style={{ position: 'relative' }}>
-                                {media.fileType === 'image' ? (
-                                  <img 
-                                    src={media.url} 
-                                    alt={media.fileName}
-                                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                  />
-                                ) : (
-                                  <video 
-                                    src={media.url}
-                                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                    controls={false}
-                                  />
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newMedia = section.media!.filter((_, i) => i !== mediaIndex);
-                                    updateSection(section.id, { media: newMedia });
-                                  }}
-                                  style={{
-                                    position: 'absolute',
-                                    top: '2px',
-                                    right: '2px',
-                                    background: 'red',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '50%',
-                                    width: '20px',
-                                    height: '20px',
-                                    fontSize: '12px',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+                      <>
+                        {/* ✅ ADD DESCRIPTION FIELDS */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                          <div className="form-group">
+                            <label>Description (English)</label>
+                            <textarea
+                              value={section.contentEn || ''}
+                              onChange={(e) => updateSection(section.id, { contentEn: e.target.value })}
+                              rows={3}
+                              placeholder="Optional description for this section"
+                            />
                           </div>
-                        )}
-                      </div>
+                          
+                          <div className="form-group">
+                            <label>Description (Arabic)</label>
+                            <textarea
+                              value={section.contentAr || ''}
+                              onChange={(e) => updateSection(section.id, { contentAr: e.target.value })}
+                              rows={3}
+                              dir="rtl"
+                              placeholder="وصف اختياري لهذا القسم"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Upload Media */}
+                        <div className="form-group">
+                          <label>Upload {section.type === 'photos' ? 'Images' : 'Videos'}</label>
+                          <input
+                            type="file"
+                            multiple
+                            accept={section.type === 'photos' ? 'image/*' : 'video/*'}
+                            onChange={(e) => {
+                              if (e.target.files) {
+                                handleSectionMediaUpload(section.id, e.target.files);
+                              }
+                            }}
+                          />
+                          
+                          {/* Show uploaded media */}
+                          {section.media && section.media.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                              {section.media.map((media, mediaIndex) => (
+                                <div key={mediaIndex} style={{ position: 'relative' }}>
+                                  {media.fileType === 'image' ? (
+                                    <img 
+                                      src={media.url} 
+                                      alt={media.fileName}
+                                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                                    />
+                                  ) : (
+                                    <video 
+                                      src={media.url}
+                                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                                      controls={false}
+                                    />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newMedia = section.media!.filter((_, i) => i !== mediaIndex);
+                                      updateSection(section.id, { media: newMedia });
+                                    }}
+                                    style={{
+                                      position: 'absolute',
+                                      top: '5px',
+                                      right: '5px',
+                                      background: 'red',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '50%',
+                                      width: '20px',
+                                      height: '20px',
+                                      cursor: 'pointer',
+                                      fontSize: '12px'
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 ))}
@@ -2702,134 +2943,220 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* Automated Backup Section */}
+      {/* ========== BACKUP SECTION ========== */}
       <div className="settings-section">
-        <h3>💾 Automated Backup System</h3>
-        <p>Schedule automatic backups of all system data</p>
-        
-        {/* Manual Backup Button */}
-        <div style={{ marginBottom: '30px' }}>
-          <button
-            className="btn btn-primary"
-            onClick={handleDownloadBackup}
-            disabled={downloadingBackup}
-            style={{
-              padding: '12px 24px',
-              fontSize: '16px',
-              backgroundColor: downloadingBackup ? '#ccc' : '#28a745',
-              cursor: downloadingBackup ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {downloadingBackup ? '📦 Creating Backup...' : '📥 Download Backup Now'}
-          </button>
-          <small style={{ display: 'block', marginTop: '10px', color: 'var(--text-secondary)' }}>
-            Creates an Excel file with all data from: Martyrs, Wars, Locations, Villages, Sectors, Legends, Activities, Activity Types, Dynamic Pages, News, Users, Stories, Settings, and Notifications
-          </small>
+        <div className="section-header">
+          <div>
+            <h2>💾 Backup & Export</h2>
+            <p>Download a complete backup of all system data</p>
+          </div>
         </div>
 
-        {/* Automated Schedule */}
-        <div style={{
-          background: 'var(--surface-color)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '8px',
-          padding: '20px',
-          marginTop: '20px'
-        }}>
-          <h4>⏰ Backup Schedule</h4>
-          
-          <div className="form-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={backupConfig.enabled}
-                onChange={(e) => setBackupConfig({ ...backupConfig, enabled: e.target.checked })}
-              />
-              <span style={{ marginLeft: '8px' }}>Enable Automated Backups</span>
-            </label>
-          </div>
-
-          {backupConfig.enabled && (
-            <>
-              <div className="form-group">
-                <label>Backup Frequency</label>
-                <select
-                  value={backupConfig.frequency}
-                  onChange={(e) => setBackupConfig({ ...backupConfig, frequency: e.target.value as any })}
-                  style={{
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    width: '100%',
-                    maxWidth: '300px'
-                  }}
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly (Every Monday)</option>
-                  <option value="monthly">Monthly (1st of each month)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Backup Time (24-hour format)</label>
-                <input
-                  type="time"
-                  value={backupConfig.time}
-                  onChange={(e) => setBackupConfig({ ...backupConfig, time: e.target.value })}
-                  style={{
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    maxWidth: '200px'
-                  }}
-                />
-                <small style={{ display: 'block', marginTop: '5px', color: 'var(--text-secondary)' }}>
-                  Server timezone: UTC
-                </small>
-              </div>
-
-              {backupConfig.lastBackup && (
-                <div style={{
-                  padding: '15px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  borderRadius: '6px',
-                  marginTop: '15px'
-                }}>
-                  <strong>Last Backup:</strong> {new Date(backupConfig.lastBackup).toLocaleString()}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Move save button OUTSIDE the conditional block */}
-          <button
-            className="btn btn-primary"
-            onClick={handleSaveBackupConfig}
+        <div className="backup-actions">
+          <button 
+            onClick={handleDownloadBackup}
             disabled={loading}
-            style={{ marginTop: '15px' }}
+            className="btn-primary"
+            style={{ padding: '12px 24px', fontSize: '16px' }}
           >
-            {loading ? 'Saving...' : '💾 Save Backup Schedule'}
+            {loading ? '⏳ Generating Backup...' : '📥 Download Backup Now'}
           </button>
+        </div>
 
-          {backupConfig.enabled && (
-            <div style={{
-              marginTop: '20px',
-              padding: '15px',
-              background: '#e3f2fd',
-              borderRadius: '6px',
-              fontSize: '14px',
-              border: '1px solid #2196f3'
-            }}>
-              <strong>ℹ️ Automatic Backups Enabled</strong>
-              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#555' }}>
-                The system will remind you to download a backup {backupConfig.frequency === 'monthly' ? 'monthly' : backupConfig.frequency === 'weekly' ? 'weekly' : 'daily'}.
-                {backupConfig.lastBackup && (
-                  <> Last backup: {new Date(backupConfig.lastBackup).toLocaleDateString()}</>
-                )}
-              </p>
-            </div>
-          )}
+        <div className="info-box" style={{ marginTop: '20px' }}>
+          <p><strong>📋 Backup Contents:</strong></p>
+          <p>Creates an Excel file with all data from:</p>
+          <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
+            <li>✅ Martyrs & Wars</li>
+            <li>✅ Locations, Villages & Sectors</li>
+            <li>✅ Legends & Activities</li>
+            <li>✅ Activity Types & Dynamic Pages</li>
+            <li>✅ News & Stories</li>
+            <li>✅ Users & Settings</li>
+            <li>✅ Notifications</li>
+          </ul>
         </div>
       </div>
+
+      {/* Page Categories Management - NEW SECTION */}
+      <div className="settings-section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h3>📁 Page Categories Management</h3>
+            <p>Create categories to organize your dynamic pages in the website header</p>
+          </div>
+          <button 
+            className="btn btn-primary"
+            onClick={() => setShowCategoryForm(true)}
+            disabled={loading}
+          >
+            ➕ Add New Category
+          </button>
+        </div>
+
+        {pageCategories.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px',
+            background: 'var(--surface-color)',
+            borderRadius: '8px',
+            border: '2px dashed var(--border-color)'
+          }}>
+            <h4>No categories yet</h4>
+            <p>Create your first category to organize dynamic pages</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {pageCategories.map(category => (
+              <div 
+                key={category.id} 
+                style={{
+                  background: 'var(--surface-color)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  boxShadow: 'var(--shadow)'
+                }}
+              >
+                <div style={{ marginBottom: '15px' }}>
+                  <h4 style={{ margin: '0 0 5px 0', color: 'var(--text-primary)' }}>
+                    {category.nameEn}
+                  </h4>
+                  <p style={{ margin: '0 0 10px 0', color: 'var(--text-secondary)', fontSize: '14px', direction: 'rtl' }}>
+                    {category.nameAr}
+                  </p>
+                  {category.descriptionEn && (
+                    <p style={{ margin: '10px 0', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      {category.descriptionEn}
+                    </p>
+                  )}
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span>📊 Order: {category.displayOrder}</span>
+                    <span style={{ marginLeft: '10px' }}>
+                      {category.isActive ? '✅ Active' : '❌ Inactive'}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => handleEditCategory(category)}
+                    style={{ flex: 1 }}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    className="btn-danger"
+                    onClick={() => handleDeleteCategory(category.id!, category.nameEn)}
+                    style={{ flex: 1 }}
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Category Form Modal */}
+      {showCategoryForm && (
+        <div className="modal-overlay" onClick={resetCategoryForm}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h2>{editingCategory ? 'Edit Category' : 'Add New Category'}</h2>
+              <button className="close-btn" onClick={resetCategoryForm}>×</button>
+            </div>
+
+            <form onSubmit={handleCategorySubmit} className="form" style={{ 
+              maxWidth: '800px', 
+              margin: '0 auto' 
+            }}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Name (English) *</label>
+                  <input
+                    type="text"
+                    value={categoryFormData.nameEn}
+                    onChange={(e) => handleCategoryFormChange('nameEn', e.target.value)}
+                    required
+                    placeholder="e.g., Sports"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Name (Arabic) *</label>
+                  <input
+                    type="text"
+                    value={categoryFormData.nameAr}
+                    onChange={(e) => handleCategoryFormChange('nameAr', e.target.value)}
+                    required
+                    className="arabic-text"
+                    placeholder="مثلاً، الرياضة"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Description (English)</label>
+                  <textarea
+                    value={categoryFormData.descriptionEn}
+                    onChange={(e) => handleCategoryFormChange('descriptionEn', e.target.value)}
+                    rows={2}
+                    placeholder="Optional description"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Description (Arabic)</label>
+                  <textarea
+                    value={categoryFormData.descriptionAr}
+                    onChange={(e) => handleCategoryFormChange('descriptionAr', e.target.value)}
+                    rows={2}
+                    className="arabic-text"
+                    placeholder="وصف اختياري"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Display Order</label>
+                  <input
+                    type="number"
+                    value={categoryFormData.displayOrder}
+                    onChange={(e) => handleCategoryFormChange('displayOrder', parseInt(e.target.value))}
+                    min="0"
+                  />
+                  <small>Lower numbers appear first in the header</small>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={categoryFormData.isActive}
+                      onChange={(e) => handleCategoryFormChange('isActive', e.target.checked)}
+                    />
+                    <span>Active</span>
+                  </label>
+                  <small>Only active categories appear on the website</small>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="cancel-btn" onClick={resetCategoryForm}>
+                  Cancel
+                </button>
+                <button type="submit" className="submit-btn" disabled={loading}>
+                  {loading ? 'Saving...' : editingCategory ? 'Update Category' : 'Add Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }; // This closes the Settings function

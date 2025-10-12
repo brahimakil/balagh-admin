@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
+import SocialMediaSection from '../components/SocialMediaSection';
+import YouTubeSection from '../components/YouTubeSection';
 
 interface Contact {
   id: string;
@@ -35,21 +37,6 @@ interface AllContent {
   activities: ContentItem[];
   news: ContentItem[];
   liveNews: ContentItem[];
-}
-
-// ✅ NEW: Instagram Thread interface
-interface InstagramThread {
-  id: string;
-  name: string;
-  users: Array<{
-    id: string;
-    username: string;
-    fullName: string;
-    profilePic: string;
-  }>;
-  lastMessage: string;
-  timestamp: number;
-  isGroup: boolean;
 }
 
 const SimpleWhatsApp: React.FC = () => {
@@ -96,20 +83,6 @@ const SimpleWhatsApp: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [currentContentPage, setCurrentContentPage] = useState(1);
   const [itemsPerPage] = useState(12);
-
-  // ========== INSTAGRAM STATE ==========
-  const [igConnected, setIgConnected] = useState(false);
-  const [igUsername, setIgUsername] = useState('');
-  const [igPassword, setIgPassword] = useState('');
-  const [igLoading, setIgLoading] = useState(false);
-  const [igThreads, setIgThreads] = useState<InstagramThread[]>([]);
-  const [selectedIgThreads, setSelectedIgThreads] = useState<string[]>([]);
-  const [igMessage, setIgMessage] = useState('');
-  const [showIgLogin, setShowIgLogin] = useState(false);
-  const [igSessionData, setIgSessionData] = useState('');
-  const [showSessionImport, setShowSessionImport] = useState(false);
-  
-  const IG_BACKEND_URL = 'https://instagram-backend-chi.vercel.app';
 
   const BACKEND_URL = 'https://balaghwhatsapp-production.up.railway.app';
 
@@ -160,43 +133,6 @@ const SimpleWhatsApp: React.FC = () => {
 
     return () => {
       socket.disconnect();
-    };
-  }, []);
-
-  // ========== INSTAGRAM SOCKET CONNECTION ==========
-  useEffect(() => {
-    const connectIgSocket = () => {
-      const socket = io(IG_BACKEND_URL);
-      
-      socket.on('connect', () => {
-        console.log('Connected to Instagram server');
-      });
-
-      socket.on('instagram-ready', (data) => {
-        setIgConnected(true);
-        setSuccess(`Instagram connected as @${data.username}!`);
-        setShowIgLogin(false);
-        loadIgThreads();
-      });
-
-      socket.on('instagram-disconnected', () => {
-        setIgConnected(false);
-        setSuccess('Instagram disconnected');
-      });
-
-      socket.on('instagram-auth-failed', (data) => {
-        setIgConnected(false);
-        setError(`Instagram auth failed: ${data.reason}`);
-      });
-
-      return socket;
-    };
-
-    const igSocket = connectIgSocket();
-    checkIgStatus();
-
-    return () => {
-      igSocket.disconnect();
     };
   }, []);
 
@@ -782,218 +718,6 @@ const SimpleWhatsApp: React.FC = () => {
     return desc.length > 100 ? desc.substring(0, 100) + '...' : desc;
   };
 
-  // ========== INSTAGRAM FUNCTIONS ==========
-  const checkIgStatus = async () => {
-    try {
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/status`);
-      if (response.ok) {
-        const data = await response.json();
-        setIgConnected(data.connected);
-        if (data.connected) {
-          loadIgThreads();
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check Instagram status:', error);
-    }
-  };
-
-  const connectInstagram = async () => {
-    try {
-      setIgLoading(true);
-      setError('');
-      
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/connect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: igUsername, password: igPassword })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to connect');
-      }
-      
-      const result = await response.json();
-      setSuccess(`Connected to Instagram as @${result.user.username}!`);
-      setIgConnected(true);
-      setShowIgLogin(false);
-      setIgPassword('');
-      
-      await loadIgThreads();
-      
-    } catch (error: any) {
-      setError(`Instagram login failed: ${error.message}`);
-      setIgConnected(false);
-    } finally {
-      setIgLoading(false);
-    }
-  };
-
-  const disconnectInstagram = async () => {
-    try {
-      setIgLoading(true);
-      
-      // ✅ CLEAR ALL SELECTIONS when disconnecting
-      setSelectedContent([]);
-      setSelectedItems(new Set());
-      setSelectedIgThreads([]);
-      
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/disconnect`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to disconnect');
-      }
-      
-      setIgConnected(false);
-      setIgThreads([]);
-      setSuccess('Disconnected from Instagram');
-      
-    } catch (error: any) {
-      setError(`Disconnect failed: ${error.message}`);
-    } finally {
-      setIgLoading(false);
-    }
-  };
-
-  const loadIgThreads = async () => {
-    try {
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/threads`);
-      if (response.ok) {
-        const data = await response.json();
-        setIgThreads(Array.isArray(data) ? data : []);
-      } else {
-        console.error('Failed to load Instagram threads:', response.status);
-        setIgThreads([]);
-      }
-    } catch (error) {
-      console.error('Failed to load Instagram threads:', error);
-      setIgThreads([]);
-    }
-  };
-
-  const sendIgMessage = async () => {
-    if (!igConnected) {
-      setError('Instagram is not connected. Please connect first.');
-      return;
-    }
-
-    if (selectedIgThreads.length === 0 || !igMessage.trim()) {
-      setError('Please select threads and enter a message');
-      return;
-    }
-
-    try {
-      setIgLoading(true);
-      setError('');
-      
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/send/multiple`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          threadIds: selectedIgThreads, 
-          message: igMessage.trim() 
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to send messages');
-      
-      const result = await response.json();
-      setSuccess(`Instagram messages sent! Success: ${result.success.length}, Failed: ${result.failed.length}`);
-      
-      setIgMessage('');
-    } catch (error) {
-      setError('Failed to send Instagram messages');
-    } finally {
-      setIgLoading(false);
-    }
-  };
-
-  const shareToInstagram = async () => {
-    if (!igConnected) {
-      setError('Instagram is not connected. Please connect first.');
-      return;
-    }
-
-    if (selectedContent.length === 0) {
-      setError('Please select content to share');
-      return;
-    }
-
-    if (selectedIgThreads.length === 0) {
-      setError('Please select Instagram threads');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError('');
-      
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/share`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          selectedContent,
-          threadIds: selectedIgThreads,
-          delaySeconds: shareDelaySeconds
-        })
-      });
-      
-      if (!response.ok) throw new Error('Failed to share to Instagram');
-      
-      const results = await response.json();
-      setSuccess(`Content shared to Instagram! Success: ${results.success.length}, Failed: ${results.failed.length}`);
-      
-      setSelectedContent([]);
-      setSelectedIgThreads([]);
-      setShowContentSharing(false);
-    } catch (error) {
-      setError('Failed to share content to Instagram');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const importIgSession = async () => {
-    try {
-      setIgLoading(true);
-      setError('');
-      
-      // ✅ CLEAR ALL SELECTIONS before connecting
-      setSelectedContent([]);
-      setSelectedItems(new Set());
-      setSelectedContacts([]);
-      setSelectedGroups([]);
-      setSelectedIgThreads([]);
-      
-      const response = await fetch(`${IG_BACKEND_URL}/api/instagram/import-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionData: igSessionData })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to import session');
-      }
-      
-      const result = await response.json();
-      setSuccess(`Connected to Instagram as @${result.user.username}!`);
-      setIgConnected(true);
-      setShowSessionImport(false);
-      setIgSessionData('');
-      
-      await loadIgThreads();
-      
-    } catch (error: any) {
-      setError(`Session import failed: ${error.message}`);
-    } finally {
-      setIgLoading(false);
-    }
-  };
-
   return (
     <div className="page-container">
       <div className="page-header">
@@ -1548,39 +1272,23 @@ const SimpleWhatsApp: React.FC = () => {
             <div className="selected-summary">
               <p><strong>Ready to Share:</strong> {selectedContent.length} content items</p>
               <p><strong>WhatsApp:</strong> {selectedContacts.length} contacts, {selectedGroups.length} groups</p>
-              <p><strong>Instagram:</strong> {selectedIgThreads.length} threads</p>
             </div>
 
             {/* Share Buttons */}
             <div className="action-buttons">
-              {/* WhatsApp Share Button */}
               {(selectedContacts.length > 0 || selectedGroups.length > 0) && (
                 <button 
                   onClick={shareSelectedContent} 
                   disabled={loading || selectedContent.length === 0}
                   className="btn btn-success btn-lg"
-                  style={{ marginRight: '10px' }}
                 >
                   📤 Share to WhatsApp ({selectedContent.length} Items)
                 </button>
               )}
               
-              {/* Instagram Share Button */}
-              {selectedIgThreads.length > 0 && igConnected && (
-                <button 
-                  onClick={shareToInstagram} 
-                  disabled={loading || selectedContent.length === 0}
-                  className="btn btn-success btn-lg"
-                  style={{ background: '#E1306C' }}
-                >
-                  📸 Share to Instagram ({selectedContent.length} Items)
-                </button>
-              )}
-              
-              {/* Show message if no recipients selected */}
-              {selectedContacts.length === 0 && selectedGroups.length === 0 && selectedIgThreads.length === 0 && (
+              {selectedContacts.length === 0 && selectedGroups.length === 0 && (
                 <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                  ℹ️ Select WhatsApp contacts/groups or Instagram threads to share content
+                  ℹ️ Select WhatsApp contacts/groups to share content
                 </p>
               )}
             </div>
@@ -1588,206 +1296,22 @@ const SimpleWhatsApp: React.FC = () => {
         </div>
       )}
 
-      {/* Add this button to your main interface */}
       <button 
         onClick={() => {
           setShowContentSharing(true);
           loadAllContent();
         }}
         className="btn btn-info"
-        disabled={!connected && !igConnected}
+        disabled={!connected}
       >
         📤 Share Content
       </button>
 
-      {/* ========== INSTAGRAM SECTION ========== */}
-      <div className="section-card" style={{ marginTop: '40px', borderTop: '3px solid #E1306C' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '32px' }}>📸</span>
-          Instagram Connection
-        </h2>
-        
-        <div className="connection-status">
-          <span className={`status-indicator ${igConnected ? 'connected' : 'disconnected'}`}>
-            {igConnected ? '🟢 Connected' : '🔴 Disconnected'}
-          </span>
-        </div>
-        
-        {!igConnected && !showIgLogin && !showSessionImport && (
-          <>
-         
-            <button 
-              onClick={() => setShowSessionImport(true)} 
-              className="btn btn-secondary"
-            >
-              🍪 Import Session 
-            </button>
-          </>
-        )}
+      {/* Social Media Section - SEPARATE FROM WHATSAPP */}
+      <SocialMediaSection />
 
-        {showIgLogin && !igConnected && (
-          <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
-            <h3>Login to Instagram</h3>
-            <div className="form-group">
-              <input
-                type="text"
-                placeholder="Instagram Username"
-                value={igUsername}
-                onChange={(e) => setIgUsername(e.target.value)}
-                className="form-input"
-              />
-              <input
-                type="password"
-                placeholder="Instagram Password"
-                value={igPassword}
-                onChange={(e) => setIgPassword(e.target.value)}
-                className="form-input"
-              />
-            </div>
-            <div className="action-buttons">
-              <button 
-                onClick={connectInstagram} 
-                disabled={igLoading || !igUsername || !igPassword} 
-                className="btn btn-primary"
-              >
-                {igLoading ? '⏳ Connecting...' : '✅ Connect'}
-              </button>
-              <button 
-                onClick={() => {
-                  setShowIgLogin(false);
-                  setIgUsername('');
-                  setIgPassword('');
-                }} 
-                className="btn btn-secondary"
-              >
-                ❌ Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showSessionImport && !igConnected && (
-          <div className="form-section" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
-            <h3>Import Instagram Session</h3>
-            <p style={{ marginBottom: '15px', color: 'var(--text-secondary)' }}>
-              📋 <strong>How to get your session:</strong><br/>
-              1. Install "EditThisCookie" Chrome extension<br/>
-              2. Login to Instagram in your browser<br/>
-              3. Click the extension and click "Export"<br/>
-              4. Paste the JSON here
-            </p>
-            <div className="form-group">
-              <textarea
-                placeholder='Paste Instagram cookies JSON here...'
-                value={igSessionData}
-                onChange={(e) => setIgSessionData(e.target.value)}
-                className="form-textarea"
-                rows={8}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
-              />
-            </div>
-            <div className="action-buttons">
-              <button 
-                onClick={importIgSession} 
-                disabled={igLoading || !igSessionData.trim()} 
-                className="btn btn-primary"
-              >
-                {igLoading ? '⏳ Importing...' : '✅ Import Session'}
-              </button>
-              <button 
-                onClick={() => {
-                  setShowSessionImport(false);
-                  setIgSessionData('');
-                }} 
-                className="btn btn-secondary"
-              >
-                ❌ Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {igConnected && (
-          <>
-            <button 
-              onClick={disconnectInstagram} 
-              disabled={igLoading}
-              className="btn btn-secondary"
-            >
-              {igLoading ? '⏳ Disconnecting...' : '🔌 Disconnect'}
-            </button>
-
-            {/* Instagram Threads */}
-            <div className="section-card" style={{ marginTop: '20px' }}>
-              <h2>💬 Instagram Chats ({igThreads.length})</h2>
-              
-              <div className="groups-list">
-                {igThreads.map(thread => (
-                  <div 
-                    key={thread.id} 
-                    className={`group-card ${selectedIgThreads.includes(thread.id) ? 'selected' : ''}`}
-                    onClick={() => {
-                      if (selectedIgThreads.includes(thread.id)) {
-                        setSelectedIgThreads(selectedIgThreads.filter(id => id !== thread.id));
-                      } else {
-                        setSelectedIgThreads([...selectedIgThreads, thread.id]);
-                      }
-                    }}
-                  >
-                    <div className="group-header">
-                      <div className="group-info">
-                        <h3>{thread.isGroup ? '👥' : '💬'} {thread.name}</h3>
-                        <p>{thread.lastMessage}</p>
-                        {selectedIgThreads.includes(thread.id) && <span className="selected-badge">✅ Selected</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <p>Selected: {selectedIgThreads.length} threads</p>
-            </div>
-
-            {/* Instagram Messaging */}
-            {selectedIgThreads.length > 0 && (
-              <div className="section-card messaging-section" style={{ marginTop: '20px' }}>
-                <h2>📤 Send Instagram Messages</h2>
-                
-                <div className="selection-summary">
-                  <p><strong>Selected:</strong> {selectedIgThreads.length} threads</p>
-                  <button onClick={() => setSelectedIgThreads([])} className="btn btn-warning">
-                    🗑️ Clear Selection
-                  </button>
-                </div>
-
-                <div className="message-form" style={{ background: 'var(--surface-color)', borderColor: 'var(--border-color)' }}>
-                  <textarea
-                    value={igMessage}
-                    onChange={(e) => setIgMessage(e.target.value)}
-                    placeholder="Enter your Instagram message..."
-                    className="form-textarea"
-                    rows={4}
-                  />
-                  <p>Characters: {igMessage.length}</p>
-
-                  <div className="action-buttons">
-                    <button 
-                      onClick={sendIgMessage}
-                      disabled={igLoading || !igMessage.trim()}
-                      className="btn btn-primary"
-                    >
-                      {igLoading ? '⏳ Sending...' : `📸 Send to ${selectedIgThreads.length} Threads`}
-                    </button>
-                    <button onClick={() => setIgMessage('')} className="btn btn-secondary">
-                      🗑️ Clear Message
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {/* YouTube Section - NEW */}
+      <YouTubeSection />
     </div>
   );
 };

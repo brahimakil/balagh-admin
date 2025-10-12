@@ -109,10 +109,35 @@ export const martyrsService = {
         mainIconUrl = mainIconResult.url;
       }
       
+      // ✅ ADD: Handle QR code upload to Firebase Storage
+      let qrCodeUrl = martyr.qrCode || '';
+      if (martyr.qrCode && martyr.qrCode.startsWith('data:image')) {
+        // It's a base64 image, upload to Firebase Storage
+        try {
+          const base64Data = martyr.qrCode.split(',')[1] || martyr.qrCode;
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/png' });
+          const qrFile = new File([blob], `qr-temp.png`, { type: 'image/png' });
+          
+          const qrFolderPath = fileUploadService.generateFolderPath('martyrs', 'temp', 'qrcode');
+          const qrResult = await fileUploadService.uploadFile(qrFile, qrFolderPath, `qr-${Date.now()}`);
+          qrCodeUrl = qrResult.url;
+        } catch (error) {
+          console.error('Error uploading QR code:', error);
+          qrCodeUrl = martyr.qrCode; // Fallback to base64
+        }
+      }
+      
       // First create the martyr document to get the ID
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...martyr,
         mainIcon: mainIconUrl,
+        qrCode: qrCodeUrl, // ✅ Store Firebase Storage URL or base64 fallback
         dob: Timestamp.fromDate(martyr.dob),
         dateOfShahada: Timestamp.fromDate(martyr.dateOfShahada),
         createdAt: Timestamp.fromDate(now),
@@ -144,18 +169,43 @@ export const martyrsService = {
         });
       }
 
+      // ✅ ADD: Upload QR code to proper location with document ID
+      if (qrCodeUrl && qrCodeUrl.includes('temp')) {
+        try {
+          // Re-upload to proper location
+          const response = await fetch(qrCodeUrl);
+          const blob = await response.blob();
+          const qrFile = new File([blob], 'qr-code.png', { type: 'image/png' });
+          
+          const properQrPath = fileUploadService.generateFolderPath('martyrs', docRef.id, 'qrcode');
+          const properQrResult = await fileUploadService.uploadFile(qrFile, properQrPath, 'qr-code');
+          
+          await updateDoc(docRef, {
+            qrCode: properQrResult.url,
+            updatedAt: Timestamp.fromDate(new Date()),
+          });
+          
+          // Delete temp QR code
+          try {
+            await fileUploadService.deleteFile(qrCodeUrl);
+          } catch (deleteError) {
+            console.warn('Could not delete temporary QR code:', deleteError);
+          }
+        } catch (error) {
+          console.error('Error moving QR code to proper location:', error);
+        }
+      }
+
       // Now upload the main icon to the proper location with document ID if needed
       if (mainIconFile) {
         const properMainIconPath = fileUploadService.generateFolderPath('martyrs', docRef.id, 'main');
         const properMainIconResult = await fileUploadService.uploadFile(mainIconFile, properMainIconPath, 'main-icon');
         
-        // Update document with proper main icon URL
         await updateDoc(docRef, {
           mainIcon: properMainIconResult.url,
           updatedAt: Timestamp.fromDate(new Date()),
         });
         
-        // Delete the temporary main icon
         try {
           await fileUploadService.deleteMultipleFiles([mainIconUrl]);
         } catch (deleteError) {
@@ -183,18 +233,52 @@ export const martyrsService = {
   // Update martyr
   async updateMartyr(
     id: string, 
-    martyr: Martyr,
+    data: Partial<Martyr>, 
     currentUserEmail: string,
     currentUserName?: string,
-    photoFiles?: File[],
-    videoFiles?: File[],
+    newPhotoFiles?: File[],
+    newVideoFiles?: File[],
     mainIconFile?: File
   ): Promise<void> {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const martyrRef = doc(db, COLLECTION_NAME, id);
+      const martyrDoc = await getDoc(martyrRef);
       
+      if (!martyrDoc.exists()) {
+        throw new Error('Martyr not found');
+      }
+
+      const existingMartyr = { id: martyrDoc.id, ...martyrDoc.data() } as Martyr;
+
+      // ✅ Handle QR code upload
+      let qrCodeUrl = data.qrCode || existingMartyr.qrCode || '';
+      if (data.qrCode && data.qrCode.startsWith('data:image')) {
+        try {
+          if (existingMartyr.qrCode && existingMartyr.qrCode.includes('firebase')) {
+            await fileUploadService.deleteFile(existingMartyr.qrCode);
+          }
+          
+          const base64Data = data.qrCode.split(',')[1] || data.qrCode;
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/png' });
+          const qrFile = new File([blob], `qr-${id}.png`, { type: 'image/png' });
+          
+          const qrFolderPath = fileUploadService.generateFolderPath('martyrs', id, 'qrcode');
+          const qrResult = await fileUploadService.uploadFile(qrFile, qrFolderPath, 'qr-code');
+          qrCodeUrl = qrResult.url;
+        } catch (error) {
+          console.error('Error uploading QR code:', error);
+          qrCodeUrl = data.qrCode;
+        }
+      }
+
       // Upload main icon if provided
-      let mainIconUrl = martyr.mainIcon; // Keep existing if no new file
+      let mainIconUrl = data.mainIcon || existingMartyr.mainIcon; // Keep existing if no new file
       if (mainIconFile) {
         const mainIconPath = fileUploadService.generateFolderPath('martyrs', id, 'main');
         const mainIconResult = await fileUploadService.uploadFile(mainIconFile, mainIconPath, 'main-icon');
@@ -205,49 +289,60 @@ export const martyrsService = {
       let newPhotos: UploadedFile[] = [];
       let newVideos: UploadedFile[] = [];
 
-      if (photoFiles && photoFiles.length > 0) {
+      if (newPhotoFiles && newPhotoFiles.length > 0) {
         const photoFolderPath = fileUploadService.generateFolderPath('martyrs', id, 'photos');
-        newPhotos = await fileUploadService.uploadMultipleFiles(photoFiles, photoFolderPath);
+        newPhotos = await fileUploadService.uploadMultipleFiles(newPhotoFiles, photoFolderPath);
       }
 
-      if (videoFiles && videoFiles.length > 0) {
+      if (newVideoFiles && newVideoFiles.length > 0) {
         const videoFolderPath = fileUploadService.generateFolderPath('martyrs', id, 'videos');
-        newVideos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
+        newVideos = await fileUploadService.uploadMultipleFiles(newVideoFiles, videoFolderPath);
       }
 
       // Combine existing and new files
-      const updatedPhotos = [...(martyr.photos || []), ...newPhotos];
-      const updatedVideos = [...(martyr.videos || []), ...newVideos];
+      const updatedPhotos = [...(existingMartyr.photos || []), ...newPhotos];
+      const updatedVideos = [...(existingMartyr.videos || []), ...newVideos];
 
-      await updateDoc(docRef, {
-        nameEn: martyr.nameEn,
-        nameAr: martyr.nameAr,
-        jihadistNameEn: martyr.jihadistNameEn,
-        jihadistNameAr: martyr.jihadistNameAr,
-        warId: martyr.warId,
-        familyStatus: martyr.familyStatus,
-        numberOfChildren: martyr.numberOfChildren,
-        dob: Timestamp.fromDate(martyr.dob),
-        placeOfBirthEn: martyr.placeOfBirthEn,
-        placeOfBirthAr: martyr.placeOfBirthAr,
-        dateOfShahada: Timestamp.fromDate(martyr.dateOfShahada),
-        burialPlaceEn: martyr.burialPlaceEn,
-        burialPlaceAr: martyr.burialPlaceAr,
-        storyEn: martyr.storyEn,
-        storyAr: martyr.storyAr,
+      // ✅ FIX: Remove undefined fields from data recursively
+      const cleanData: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && value !== null) {
+          cleanData[key] = value;
+        }
+      }
+
+      const updateData: any = {
+        ...cleanData,
+        qrCode: qrCodeUrl,
         mainIcon: mainIconUrl,
         photos: updatedPhotos,
         videos: updatedVideos,
-        qrCode: martyr.qrCode,
-        updatedAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
+      };
+
+      // Remove any undefined values that might have slipped through
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined || updateData[key] === null) {
+          delete updateData[key];
+        }
       });
+
+      // Handle date conversions if present
+      if (updateData.dob) {
+        updateData.dob = Timestamp.fromDate(updateData.dob);
+      }
+      if (updateData.dateOfShahada) {
+        updateData.dateOfShahada = Timestamp.fromDate(updateData.dateOfShahada);
+      }
+
+      await updateDoc(martyrRef, updateData);
       
       // Add notification
       await notificationsService.createCRUDNotification(
         'updated',
         'martyrs',
         id,
-        martyr.nameEn,
+        data.nameEn || existingMartyr.nameEn, // ✅ FIX: Use data.nameEn or existingMartyr.nameEn
         currentUserEmail,
         currentUserName
       );

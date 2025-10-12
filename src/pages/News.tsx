@@ -4,12 +4,19 @@ import { translationService } from '../services/translationService';
 import { useAuth } from '../context/AuthContext';
 import { fileUploadService, type UploadedFile } from '../services/fileUploadService';
 import { getNewsMainImage } from '../utils/imageHelpers';
+import { DEFAULT_IMAGES } from '../utils/constants';
 
 interface NewsProps {
-  defaultType?: 'regular' | 'live' | 'regularLive'; // ✅ Add regularLive
+  defaultType?: 'regular' | 'live' | 'regularLive';
+  isPressNewsOnly?: boolean; // ✅ NEW: Filter for press news only
+  isLiveNewsOnly?: boolean; // ✅ ADD THIS
 }
 
-const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
+const NewsPage: React.FC<NewsProps> = ({ 
+  defaultType = 'regular', 
+  isPressNewsOnly = false,
+  isLiveNewsOnly = false // ✅ ADD THIS
+}) => {
   const [news, setNews] = useState<News[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,7 +39,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     mainImage: '',
     publishDate: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
     publishTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), // Current time in HH:MM format
-    isPressNews: false // ✅ NEW: Press news checkbox
+    isPressNews: isPressNewsOnly // ✅ NEW: Press news checkbox
   });
 
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -63,12 +70,27 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
     try {
       setLoading(true);
       const newsData = await newsService.getAllNews();
-      setNews(newsData);
       
-      // Update expired live news
-      await newsService.updateExpiredLiveNews();
+      // Filter based on page type
+      let filteredNews = newsData;
+      
+      if (isPressNewsOnly) {
+        // Press News page: show only press news
+        filteredNews = newsData.filter(item => item.isPressNews === true);
+      } else if (isLiveNewsOnly) {
+        // Live News page: show only live/regularLive news
+        filteredNews = newsData.filter(item => 
+          item.type === 'live' || item.type === 'regularLive'
+        );
+      } else {
+        // Regular News page: show only regular news (exclude press news and live news)
+        filteredNews = newsData.filter(item => 
+          item.isPressNews !== true && item.type === 'regular'
+        );
+      }
+      
+      setNews(filteredNews);
     } catch (error) {
-      console.error('Error loading news:', error);
       setError('Failed to load news');
     } finally {
       setLoading(false);
@@ -91,7 +113,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       mainImage: '',
       publishDate: now.toISOString().split('T')[0],
       publishTime: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-      isPressNews: false // ✅ Reset isPressNews
+      isPressNews: isPressNewsOnly // ✅ Keep it locked
     });
     setEditingNews(null);
     setShowForm(false);
@@ -180,7 +202,7 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
       mainImage: '',
       publishDate: new Date().toISOString().split('T')[0], // Current date in YYYY-MM-DD format
       publishTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), // Current time in HH:MM format
-      isPressNews: false // ✅ Reset isPressNews
+      isPressNews: isPressNewsOnly // ✅ Reset isPressNews
     });
     setImagePreview('');
     setSelectedPhotos([]);
@@ -417,15 +439,23 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
   return (
     <div className="page-container">
       <div className="page-header">
-        <div className="page-title-section">
-          <h1 className="page-title">📰 News Management</h1>
-          <p className="page-subtitle">Manage regular and live news</p>
-        </div>
-        <div className="page-actions">
-          <button className="add-btn" onClick={() => setShowForm(true)}>
-            + Add News
-          </button>
-        </div>
+        <h1>
+          {isPressNewsOnly ? '📰 Press News Management' : 
+           isLiveNewsOnly ? '🔴 Live News Management' : 
+           '📰 News Management'}
+        </h1>
+        <p>
+          {isPressNewsOnly ? 'Manage press releases and official news' : 
+           isLiveNewsOnly ? 'Manage live and time-limited news' : 
+           'Create and manage news articles'}
+        </p>
+      </div>
+
+      {/* ✅ ADD THIS: Add News Button */}
+      <div className="actions-bar">
+        <button className="add-btn" onClick={() => setShowForm(true)}>
+          + Add News
+        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -446,6 +476,12 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
               <div className="activity-status-badges">
                 {newsItem.type === 'live' && (
                   <span className="status-badge live">🔴 LIVE</span>
+                )}
+                {newsItem.type === 'regularLive' && (
+                  <span className="status-badge regular-live">⏰ Timed Live</span>
+                )}
+                {newsItem.isPressNews && (
+                  <span className="status-badge press-news" style={{ background: '#6f42c1',  color: 'white' }}>📰 Press</span>
                 )}
               </div>
             </div>
@@ -520,9 +556,11 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                       onChange={(e) => handleInputChange('type', e.target.value)}
                       required
                     >
-                      <option value="regular">Regular News (added as regular news, not live)</option>
-                      <option value="live">Live News (added as live news, when finished it is reverted to regular)</option>
-                      <option value="regularLive">Regular Live News (added as live news and once finished it is completely deleted from the system)</option>
+                      {!isLiveNewsOnly && ( // ✅ Only show Regular option when NOT in Live News page
+                        <option value="regular">Regular News (added as regular news, not live)</option>
+                      )}
+                      <option value="live">Live News (stays live, manual expiration)</option>
+                      <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
                     </select>
                   </div>
                   
@@ -541,19 +579,21 @@ const NewsPage: React.FC<NewsProps> = ({ defaultType = 'regular' }) => {
                   )}
                 </div>
 
-                {/* ✅ Keep this one - it's properly styled */}
-                <div className="form-row">
+                {/* Press News Checkbox - Only show in Press News page */}
+                {isPressNewsOnly && !isLiveNewsOnly && ( // ✅ Only show in Press News page
                   <div className="form-group">
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <input
                         type="checkbox"
-                        checked={formData.isPressNews || false}
+                        checked={formData.isPressNews}
                         onChange={(e) => handleInputChange('isPressNews', e.target.checked)}
+                        disabled={isPressNewsOnly}
                       />
-                      📰 Press News (خبر صحفي)
+                      <span>Press News</span>
                     </label>
+                    <small>Mark as press release/official news</small>
                   </div>
-                </div>
+                )}
 
                 {/* Title Fields */}
                 <div className="form-row">

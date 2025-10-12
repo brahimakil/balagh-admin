@@ -272,6 +272,7 @@ const Activities: React.FC = () => {
       // Refresh data and close form
       await loadData();
       resetForm();
+      setShowForm(false); // ✅ Close the form after successful save
       
     } catch (error) {
       console.error('❌ Error saving activity:', error);
@@ -307,7 +308,6 @@ const Activities: React.FC = () => {
     });
     setImagePreview('');
     setEditingActivity(null); // ✅ CRITICAL: Clear editing state
-    setShowForm(false);
     // ❌ REMOVE these lines that clear the messages:
     // setError('');
     // setSuccess('');
@@ -315,6 +315,12 @@ const Activities: React.FC = () => {
     setSelectedVideos([]);
     setSelectedMainImageFile(null);
     console.log('🔄 Form reset, editingActivity cleared');
+  };
+
+  // Add this new function after resetForm
+  const handleCancel = () => {
+    resetForm();
+    setShowForm(false);
   };
 
   // ✅ FIX: Update the handleEdit function to auto-set isPrivate=true for village_admin
@@ -691,13 +697,13 @@ const Activities: React.FC = () => {
           className={activeTab === 'public' ? 'add-btn' : 'cancel-btn'}
           onClick={() => setActiveTab('public')}
         >
-          🌍 Public Activities ({activities.filter(a => !a.isPrivate).length})
+          🌍 Approved Activities ({activities.filter(a => !a.isPrivate).length})
         </button>
         <button 
           className={activeTab === 'private' ? 'add-btn' : 'cancel-btn'}
           onClick={() => setActiveTab('private')}
         >
-          🔒 Private Activities ({activities.filter(a => a.isPrivate === true).length})
+          🔒 Pending Approval Activities ({activities.filter(a => a.isPrivate === true).length})
         </button>
       </div>
 
@@ -717,7 +723,10 @@ const Activities: React.FC = () => {
             📅 Calendar View
           </button>
         </div>
-        <button className="add-btn" onClick={() => setShowForm(true)}>
+        <button className="add-btn" onClick={() => {
+  resetForm(); // Reset form first to apply village editor defaults
+  setShowForm(true);
+}}>
           + Add Activity
         </button>
       </div>
@@ -756,7 +765,13 @@ const Activities: React.FC = () => {
                   className={`calendar-day ${day.isCurrentMonth ? 'current-month' : 'other-month'} ${day.isToday ? 'today' : ''}`}
                   onClick={() => {
                     setSelectedDate(day.date);
-                    setFormData(prev => ({ ...prev, date: day.date.toISOString().split('T')[0] }));
+                    resetForm(); // Reset form first
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      date: day.date.toISOString().split('T')[0],
+                      villageId: currentUserData?.role === 'village_editor' ? (currentUserData?.assignedVillageId || '') : '',
+                      isPrivate: currentUserData?.role === 'village_editor'
+                    }));
                     setShowForm(true);
                   }}
                 >
@@ -800,7 +815,7 @@ const Activities: React.FC = () => {
                   {(() => {
                     const status = getActivityStatus(activity);
                     if (status === 'upcoming') {
-                      return <span className="status-badge upcoming">�� Scheduled</span>;
+                      return <span className="status-badge upcoming">📅 Scheduled</span>;
                     } else if (status === 'auto-active') {
                       return <span className="status-badge active">🟢 Auto-Active</span>;
                     } else if (status === 'force-active') {
@@ -840,7 +855,7 @@ const Activities: React.FC = () => {
                   })()}
                 </p>
                 <p className="dates">
-                  📅 {formatDate(activity.date)} | �� {activity.time} | ⏱️ {activity.durationHours || 24}h duration
+                  📅 {formatDate(activity.date)} | 🕐 {activity.time} | ⏱️ {activity.durationHours || 24}h duration
                 </p>
                 <div className="story-preview">
                   <p>{activity.descriptionEn.substring(0, 100)}{activity.descriptionEn.length > 100 ? '...' : ''}</p>
@@ -875,11 +890,11 @@ const Activities: React.FC = () => {
       )}
 
       {showForm && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && resetForm()}>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleCancel()}>
           <div className="modal-content large">
             <div className="modal-header">
               <h2>{editingActivity ? 'Edit Activity' : 'Add New Activity'}</h2>
-              <button className="close-btn" onClick={resetForm}>✕</button>
+              <button className="close-btn" onClick={handleCancel}>✕</button>
             </div>
             
             <form onSubmit={handleSubmit} className="activity-form">
@@ -1250,7 +1265,7 @@ const Activities: React.FC = () => {
               </div>
 
               <div className="form-actions">
-                <button type="button" className="cancel-btn" onClick={resetForm}>
+                <button type="button" className="cancel-btn" onClick={handleCancel}>
                   Cancel
                 </button>
                 <button type="submit" className="submit-btn" disabled={loading || uploading}>

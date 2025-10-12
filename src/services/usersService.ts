@@ -23,20 +23,18 @@ export interface UserPermissions {
   martyrs: boolean;
   wars: boolean;
   locations: boolean;
-  sectors: boolean; // ← ADD THIS LINE
-  villages: boolean; // ✅ NEW: Villages permission
+  sectors: boolean;
+  villages: boolean;
   activities: boolean;
   activityTypes: boolean;
   news: boolean;
-  liveNews: boolean;
   notifications: boolean;
   legends: boolean;
   admins: boolean;
   settings: boolean;
   martyrsStories: boolean;
-  importsExports: boolean; // ✅ NEW: Imports/Exports permission
-  whatsapp: boolean; // ✅ NEW: WhatsApp permission
-  // ✅ REMOVE: allowedActivityTypes?: string[]; (not needed anymore)
+  importsExports: boolean;
+  whatsapp: boolean;
 }
 
 export interface User {

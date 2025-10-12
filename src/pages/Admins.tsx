@@ -533,7 +533,6 @@ const Admins: React.FC = () => {
                             activities: 'Activities',
                             activityTypes: 'Activity Types',
                             news: 'News',
-                            liveNews: 'Live News',
                             notifications: 'Notifications',
                             legends: 'Legends',
                             admins: 'Admins Management',
