@@ -142,8 +142,10 @@ const NewsPage: React.FC<NewsProps> = ({
       setLoading(true);
       setUploading(true);
       
-      // Combine publish date and time to create full datetime
-      const publishDateTime = new Date(`${formData.publishDate}T${formData.publishTime}`);
+      // ✅ FIX: Combine publish date and time without timezone shift
+      const [year, month, day] = formData.publishDate.split('-').map(Number);
+      const [hours, minutes] = formData.publishTime.split(':').map(Number);
+      const publishDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
       
       const newsData: any = {
         ...formData,
@@ -219,10 +221,27 @@ const NewsPage: React.FC<NewsProps> = ({
     console.log('✏️ EDIT CLICKED | newsItem:', newsItem);
     console.log('🔍 isLiveNewsOnly:', isLiveNewsOnly, '| isPressNewsOnly:', isPressNewsOnly);
     
-    // Always use current date and time when editing
-    const now = new Date();
-    const publishDate = now.toISOString().split('T')[0];
-    const publishTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    // ✅ FIX: Preserve original date but fix timezone issue
+    let publishDate: string;
+    let publishTime: string;
+    
+    if (newsItem.publishDate) {
+      // ✅ Convert Firestore Timestamp to Date if needed
+      const dateObj = newsItem.publishDate instanceof Date 
+        ? newsItem.publishDate 
+        : (newsItem.publishDate as any).toDate();
+      
+      // ✅ Get date in local timezone to avoid day shifting
+      const localDate = new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000));
+      publishDate = localDate.toISOString().split('T')[0];
+      publishTime = newsItem.publishTime || localDate.toISOString().split('T')[1].substring(0, 5);
+    } else {
+      // Fallback: use current date/time for old news without publishDate
+      const now = new Date();
+      const localNow = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+      publishDate = localNow.toISOString().split('T')[0];
+      publishTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
 
     setFormData({
       titleEn: newsItem.titleEn,
@@ -232,9 +251,9 @@ const NewsPage: React.FC<NewsProps> = ({
       type: newsItem.type,
       liveDurationHours: newsItem.liveDurationHours || 2,
       mainImage: newsItem.mainImage,
-      publishDate, // Always current date
-      publishTime,  // Always current time
-      isPressNews: newsItem.isPressNews || false // ✅ NEW: Load isPressNews value
+      publishDate, // ✅ Preserved original date (with timezone fix)
+      publishTime, // ✅ Preserved original time
+      isPressNews: newsItem.isPressNews || false
     });
     setImagePreview(newsItem.mainImage);
     setSelectedPhotos([]);

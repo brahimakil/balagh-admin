@@ -138,6 +138,10 @@ const Activities: React.FC = () => {
     const forcePrivate = currentUserData?.role === 'village_editor';
     console.log('🔒 FORCING PRIVATE:', forcePrivate);
     
+    // ✅ FIX: Get date in local timezone to avoid day shifting
+    const localDate = new Date(activity.date.getTime() - (activity.date.getTimezoneOffset() * 60000));
+    const dateString = localDate.toISOString().split('T')[0];
+    
     setFormData({
       activityTypeId: activity.activityTypeId,
       villageId: activity.villageId || '',
@@ -148,7 +152,7 @@ const Activities: React.FC = () => {
       isPrivate: forcePrivate ? true : activity.isPrivate, // ✅ FORCE TRUE for village_admin
       isActive: activity.isActive,
       isManuallyReactivated: activity.isManuallyReactivated || false,
-      date: activity.date.toISOString().split('T')[0],
+      date: dateString,
       time: activity.time,
       durationHours: activity.durationHours || 24,
       mainImage: activity.mainImage || '',
@@ -175,6 +179,11 @@ const Activities: React.FC = () => {
       // Show saving progress
       setSuccess('💾 Saving activity and sending notifications...');
       
+      // ✅ FIX: Create date without timezone shift
+      const [year, month, day] = formData.date.split('-').map(Number);
+      const [hours, minutes] = formData.time.split(':').map(Number);
+      const activityDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+      
       const activityData: any = {
         activityTypeId: formData.activityTypeId,
         nameEn: formData.nameEn,
@@ -184,7 +193,7 @@ const Activities: React.FC = () => {
         isPrivate: formData.isPrivate,
         isActive: calculateInitialActiveState(formData),
         isManuallyReactivated: formData.isManuallyReactivated,
-        date: new Date(formData.date + 'T' + formData.time),
+        date: activityDate,
         time: formData.time,
         durationHours: formData.durationHours,
       };

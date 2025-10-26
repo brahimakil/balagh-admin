@@ -512,13 +512,40 @@ const MartyrsStories: React.FC = () => {
               </div>
             </div>
             
-            <div className="form-actions">
-              <button className="cancel-btn" onClick={() => handleReviewAction('rejected')}>
-                ❌ Reject Story
+            <div className="form-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+              <button 
+                type="button"
+                className="cancel-btn" 
+                onClick={closeReviewModal}
+                style={{ flex: '0 0 auto', minWidth: '100px' }}
+              >
+                ← Close
               </button>
-              <button className="submit-btn" onClick={() => handleReviewAction('approved')}>
-                ✅ Approve Story
-              </button>
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => handleReviewAction('rejected')}
+                  style={{ 
+                    background: '#dc3545', 
+                    color: 'white', 
+                    padding: '10px 20px', 
+                    border: 'none', 
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ❌ Reject
+                </button>
+                <button 
+                  type="button"
+                  className="submit-btn" 
+                  onClick={() => handleReviewAction('approved')}
+                >
+                  ✅ Approve
+                </button>
+              </div>
             </div>
           </div>
         </div>
