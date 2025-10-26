@@ -22,6 +22,9 @@ const YouTubeSection: React.FC = () => {
   // Setup
   const [showSetup, setShowSetup] = useState(false);
   const [ytToken, setYtToken] = useState('');
+  const [ytRefreshToken, setYtRefreshToken] = useState('');
+  const [ytClientId, setYtClientId] = useState('');
+  const [ytClientSecret, setYtClientSecret] = useState('');
 
   // Content selection
   const [contentType, setContentType] = useState<string>('news');
@@ -100,15 +103,27 @@ const YouTubeSection: React.FC = () => {
 
     try {
       const channelInfo = await youtubeService.verifyToken(ytToken);
+      
+      // Calculate token expiry (1 hour from now)
+      const tokenExpiresAt = Date.now() + (3600 * 1000);
 
       await youtubeService.saveCredentials({
         youtubeAccessToken: ytToken,
+        youtubeRefreshToken: ytRefreshToken || undefined,
+        youtubeClientId: ytClientId || undefined,
+        youtubeClientSecret: ytClientSecret || undefined,
         youtubeChannelId: channelInfo.id,
-        youtubeChannelName: channelInfo.name
+        youtubeChannelName: channelInfo.name,
+        tokenExpiresAt
       });
 
-      setSuccess('✅ YouTube connected successfully!');
+      const refreshMsg = ytRefreshToken ? ' (with auto-refresh ✅)' : '';
+      setSuccess(`✅ YouTube connected: ${channelInfo.name}${refreshMsg}`);
       setShowSetup(false);
+      setYtToken('');
+      setYtRefreshToken('');
+      setYtClientId('');
+      setYtClientSecret('');
       await loadCredentials();
     } catch (err: any) {
       setError(err.message);
@@ -231,23 +246,79 @@ const YouTubeSection: React.FC = () => {
           <h3 style={{ marginBottom: '15px' }}>Setup YouTube</h3>
           
           <p style={{ fontSize: '13px', marginBottom: '10px', opacity: 0.9 }}>
-            Get your OAuth 2.0 Access Token from <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'underline' }}>Google OAuth Playground</a>
+            Get your tokens from <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'underline' }}>Google OAuth Playground</a>
           </p>
           
           <input 
             type="text" 
             value={ytToken} 
             onChange={(e) => setYtToken(e.target.value)} 
-            placeholder="Access Token" 
+            placeholder="Access Token (required)" 
+            required
             style={{ 
               width: '100%', 
               padding: '8px', 
-              marginBottom: '15px', 
+              marginBottom: '10px', 
               borderRadius: '4px', 
               border: 'none', 
               color: '#000' 
             }} 
           />
+          
+          <details style={{ marginBottom: '15px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '13px', marginBottom: '10px', opacity: 0.9 }}>
+              ⚙️ Optional: Add Refresh Token (for auto-renewal)
+            </summary>
+            
+            <input 
+              type="text" 
+              value={ytRefreshToken} 
+              onChange={(e) => setYtRefreshToken(e.target.value)} 
+              placeholder="Refresh Token (optional)" 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                marginBottom: '10px', 
+                borderRadius: '4px', 
+                border: 'none', 
+                color: '#000' 
+              }} 
+            />
+            
+            <input 
+              type="text" 
+              value={ytClientId} 
+              onChange={(e) => setYtClientId(e.target.value)} 
+              placeholder="OAuth Client ID (optional)" 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                marginBottom: '10px', 
+                borderRadius: '4px', 
+                border: 'none', 
+                color: '#000' 
+              }} 
+            />
+            
+            <input 
+              type="password" 
+              value={ytClientSecret} 
+              onChange={(e) => setYtClientSecret(e.target.value)} 
+              placeholder="OAuth Client Secret (optional)" 
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                marginBottom: '10px', 
+                borderRadius: '4px', 
+                border: 'none', 
+                color: '#000' 
+              }} 
+            />
+            
+            <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '5px' }}>
+              💡 With refresh token, you won't need to reconnect every hour!
+            </p>
+          </details>
           
           <button 
             type="submit" 
