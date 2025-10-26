@@ -216,6 +216,9 @@ const NewsPage: React.FC<NewsProps> = ({
 
   // Update the handleEdit function to use current date/time
   const handleEdit = (newsItem: News) => {
+    console.log('✏️ EDIT CLICKED | newsItem:', newsItem);
+    console.log('🔍 isLiveNewsOnly:', isLiveNewsOnly, '| isPressNewsOnly:', isPressNewsOnly);
+    
     // Always use current date and time when editing
     const now = new Date();
     const publishDate = now.toISOString().split('T')[0];
@@ -237,6 +240,7 @@ const NewsPage: React.FC<NewsProps> = ({
     setSelectedPhotos([]);
     setSelectedVideos([]);
     setEditingNews(newsItem);
+    console.log('✅ editingNews SET TO:', newsItem);
     setShowForm(true);
     setSelectedMainImageFile(null); // ADD THIS
   };
@@ -553,15 +557,37 @@ const NewsPage: React.FC<NewsProps> = ({
                      <label>News Type</label>
                      <select
                        value={formData.type}
-                       onChange={(e) => handleInputChange('type', e.target.value)}
+                       onChange={(e) => {
+                         handleInputChange('type', e.target.value);
+                       }}
                        required
-                       disabled={!isLiveNewsOnly && !isPressNewsOnly} // ✅ Only disable in regular News page
+                       disabled={!isLiveNewsOnly && !isPressNewsOnly && !editingNews} // ✅ Enable when editing in regular News page
                      >
-                       {!isLiveNewsOnly && ( // ✅ Only show Regular option when NOT in Live News page
-                         <option value="regular">Regular News</option>
-                       )}
-                       {(isLiveNewsOnly || isPressNewsOnly) && ( // ✅ Only show Live options in Live/Press News pages
+                       {/* Regular News page */}
+                       {!isLiveNewsOnly && !isPressNewsOnly && (
                          <>
+                           <option value="regular">Regular News</option>
+                           {editingNews && (
+                             <>
+                               <option value="live">Live News (stays live, manual expiration)</option>
+                               <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
+                             </>
+                           )}
+                         </>
+                       )}
+                       
+                       {/* Live News page - NO regular option */}
+                       {isLiveNewsOnly && (
+                         <>
+                           <option value="live">Live News (stays live, manual expiration)</option>
+                           <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
+                         </>
+                       )}
+                       
+                       {/* Press News page - ALL options */}
+                       {isPressNewsOnly && (
+                         <>
+                           <option value="regular">Regular News</option>
                            <option value="live">Live News (stays live, manual expiration)</option>
                            <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
                          </>

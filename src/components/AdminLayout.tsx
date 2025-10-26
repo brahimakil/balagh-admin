@@ -145,6 +145,22 @@ const AdminLayout: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ✅ Global: Check for expired live news every minute (runs on all pages)
+  useEffect(() => {
+    // Import newsService dynamically
+    import('../services/newsService').then(({ newsService }) => {
+      // Run immediately on mount
+      newsService.updateExpiredLiveNews();
+      
+      // Then check every minute
+      const interval = setInterval(() => {
+        newsService.updateExpiredLiveNews();
+      }, 60000); // 60 seconds
+      
+      return () => clearInterval(interval);
+    });
+  }, []);
+
   // Check permissions for the current route
   useEffect(() => {
     const currentPath = location.pathname.split('/').pop() || 'dashboard';
