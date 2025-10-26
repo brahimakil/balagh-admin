@@ -365,30 +365,9 @@ export const usersService = {
           console.log('✅ Setting assignedVillageId to:', userData.assignedVillageId);
           updateData.assignedVillageId = userData.assignedVillageId;
           
-          // ✅ NEW: If assigning a village to a secondary admin, auto-set permissions
-          if (userData.role === 'secondary') {
-            console.log('🏘️ Secondary admin with village - setting default permissions');
-            updateData.permissions = {
-              dashboard: true,
-              martyrs: false,
-              wars: false,
-              locations: false,
-              sectors: false,
-              villages: false,
-              activities: true, // ONLY activities for their assigned village
-              activityTypes: false,
-              news: false,
-              liveNews: false,
-              pressNews: false,
-              notifications: true,
-              legends: false,
-              admins: false,
-              settings: false,
-              martyrsStories: false,
-              importsExports: false,
-              whatsapp: false,
-            };
-          }
+          // ✅ REMOVED: Don't auto-override permissions here!
+          // The frontend now handles permission updates when village is assigned
+          // We trust the permissions that come from the form
         }
       }
 

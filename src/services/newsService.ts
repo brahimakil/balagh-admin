@@ -360,6 +360,8 @@ export const newsService = {
       );
       const querySnapshot = await getDocs(q);
       
+      console.log(`🔍 Checking ${querySnapshot.docs.length} live news items for expiration...`);
+      
       const now = new Date();
       const updates: Promise<void>[] = [];
       
@@ -372,10 +374,17 @@ export const newsService = {
         
         if (newsItem.liveStartTime && newsItem.liveDurationHours) {
           const expiryTime = new Date(newsItem.liveStartTime.getTime() + (newsItem.liveDurationHours * 60 * 60 * 1000));
+          const remainingMs = expiryTime.getTime() - now.getTime();
+          const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
+          
+          console.log(`📰 "${newsItem.titleEn}" - Type: ${newsItem.type}, Remaining: ${remainingMinutes} minutes`);
           
           if (now >= expiryTime) {
+            console.log(`⏰ EXPIRED! Processing "${newsItem.titleEn}"...`);
+            
             if (newsItem.type === 'live') {
               // Existing behavior: revert to regular
+              console.log(`🔄 Converting "${newsItem.titleEn}" to regular news`);
               updates.push(
                 updateDoc(doc(db, COLLECTION_NAME, newsItem.id!), {
                   type: 'regular',
@@ -386,15 +395,20 @@ export const newsService = {
               );
             } else if (newsItem.type === 'regularLive') {
               // ✅ NEW: Delete regularLive news completely
+              console.log(`🗑️ Deleting "${newsItem.titleEn}" (regularLive auto-delete)`);
               updates.push(this.deleteNews(newsItem.id!, newsItem.titleEn, 'system', 'System Auto-Delete'));
             }
           }
         }
       }
       
-      await Promise.all(updates);
+      if (updates.length > 0) {
+        console.log(`✅ Processing ${updates.length} expired news items...`);
+        await Promise.all(updates);
+        console.log(`✅ Successfully processed ${updates.length} expired news items`);
+      }
     } catch (error) {
-      console.error('Error updating expired live news:', error);
+      console.error('❌ Error updating expired live news:', error);
     }
   }
 }; 

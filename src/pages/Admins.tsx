@@ -98,6 +98,107 @@ const Admins: React.FC = () => {
           [permissionField]: value
         }
       }));
+    } else if (field === 'role') {
+      // ✅ When role changes, auto-update permissions based on role
+      let newPermissions = formData.permissions;
+      
+      if (value === 'main') {
+        // Main admin: ALL permissions true
+        newPermissions = {
+          dashboard: true,
+          martyrs: true,
+          wars: true,
+          locations: true,
+          sectors: true,
+          villages: true,
+          activities: true,
+          activityTypes: true,
+          news: true,
+          liveNews: true,
+          pressNews: true,
+          notifications: true,
+          legends: true,
+          admins: true,
+          settings: true,
+          martyrsStories: true,
+          importsExports: true,
+          whatsapp: true,
+        };
+      } else if (value === 'village_editor') {
+        // Village editor: Only dashboard, activities, notifications
+        newPermissions = {
+          dashboard: true,
+          martyrs: false,
+          wars: false,
+          locations: false,
+          sectors: false,
+          villages: false,
+          activities: true,
+          activityTypes: false,
+          news: false,
+          liveNews: false,
+          pressNews: false,
+          notifications: true,
+          legends: false,
+          admins: false,
+          settings: false,
+          martyrsStories: false,
+          importsExports: false,
+          whatsapp: false,
+        };
+      } else if (value === 'secondary') {
+        // Secondary: Keep current permissions (user will set them manually or via village assignment)
+        // Don't auto-change permissions for secondary
+      }
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        [field]: value,
+        permissions: newPermissions
+      }));
+    } else if (field === 'assignedVillageId') {
+      // ✅ When village is assigned/removed for secondary admin, update permissions
+      setFormData(prev => {
+        console.log('🏘️ Village changed:', value);
+        console.log('👤 Current role:', prev.role);
+        console.log('📋 Old permissions:', prev.permissions);
+        
+        let newPermissions = prev.permissions;
+        
+        // If assigning a village to a secondary admin
+        if (prev.role === 'secondary' && value && value !== '') {
+          console.log('✅ Updating permissions for secondary with village');
+          // Secondary with village: Only dashboard, activities, notifications
+          newPermissions = {
+            dashboard: true,
+            martyrs: false,
+            wars: false,
+            locations: false,
+            sectors: false,
+            villages: false,
+            activities: true,
+            activityTypes: false,
+            news: false,
+            liveNews: false,
+            pressNews: false,
+            notifications: true,
+            legends: false,
+            admins: false,
+            settings: false,
+            martyrsStories: false,
+            importsExports: false,
+            whatsapp: false,
+          };
+          console.log('📋 New permissions:', newPermissions);
+        }
+        // If removing village from secondary, keep permissions as they are (manual control)
+        
+        return {
+          ...prev,
+          [field]: value,
+          permissions: newPermissions
+        };
+      });
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -131,6 +232,12 @@ const Admins: React.FC = () => {
       setLoading(true);
       setError('');
       
+      console.log('💾 SUBMITTING USER DATA:');
+      console.log('Role:', formData.role);
+      console.log('Village:', formData.assignedVillageId);
+      console.log('Permissions:', JSON.stringify(formData.permissions, null, 2));
+      console.log('activityTypes permission:', formData.permissions.activityTypes);
+      
       const userData = {
         email: formData.email,
         firstName: formData.firstName,
@@ -140,6 +247,8 @@ const Admins: React.FC = () => {
         // ✅ FIX: Explicitly pass empty string so updateUser can delete the field
         assignedVillageId: formData.assignedVillageId === '' ? '' : formData.assignedVillageId,
       };
+      
+      console.log('📤 userData.permissions.activityTypes:', userData.permissions.activityTypes);
 
       if (editingAdmin) {
         await usersService.updateUser( // ✅ FIXED: Use updateUser
@@ -217,6 +326,57 @@ const Admins: React.FC = () => {
       villageValue: admin.assignedVillageId || ''
     });
     
+    // ✅ Auto-correct permissions based on role and village assignment
+    let correctedPermissions = admin.permissions;
+    
+    if (admin.role === 'secondary' && admin.assignedVillageId) {
+      // Secondary with village: Force correct permissions
+      correctedPermissions = {
+        dashboard: true,
+        martyrs: false,
+        wars: false,
+        locations: false,
+        sectors: false,
+        villages: false,
+        activities: true,
+        activityTypes: false,
+        news: false,
+        liveNews: false,
+        pressNews: false,
+        notifications: true,
+        legends: false,
+        admins: false,
+        settings: false,
+        martyrsStories: false,
+        importsExports: false,
+        whatsapp: false,
+      };
+      console.log('✅ Auto-corrected permissions for secondary with village');
+    } else if (admin.role === 'village_editor') {
+      // Village editor: Force correct permissions
+      correctedPermissions = {
+        dashboard: true,
+        martyrs: false,
+        wars: false,
+        locations: false,
+        sectors: false,
+        villages: false,
+        activities: true,
+        activityTypes: false,
+        news: false,
+        liveNews: false,
+        pressNews: false,
+        notifications: true,
+        legends: false,
+        admins: false,
+        settings: false,
+        martyrsStories: false,
+        importsExports: false,
+        whatsapp: false,
+      };
+      console.log('✅ Auto-corrected permissions for village editor');
+    }
+    
     setFormData({
       email: admin.email,
       password: '',
@@ -224,7 +384,7 @@ const Admins: React.FC = () => {
       lastName: admin.lastName || '',
       role: admin.role,
       profilePhoto: admin.profilePhoto || '',
-      permissions: admin.permissions || {
+      permissions: correctedPermissions || {
         dashboard: false,
         martyrs: false,
         wars: false,
