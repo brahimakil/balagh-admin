@@ -104,6 +104,7 @@ export const locationsService = {
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...location,
         mainImage: mainImageUrl,
+        sectorId: location.sectorId || null, // ✅ Ensure sectorId is null if not provided
         createdAt: Timestamp.fromDate(now),
         updatedAt: Timestamp.fromDate(now),
         photos: [],

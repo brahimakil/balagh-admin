@@ -17,8 +17,6 @@ export const verificationService = {
   // Send verification code via email
   async sendVerificationCode(email: string, userName?: string): Promise<void> {
     try {
-      console.log('📧 Requesting verification code for:', email);
-      
       // Call Gmail backend to send email
       const response = await fetch(`${BACKEND_URL}/api/notifications/send-verification-code`, {
         method: 'POST',
@@ -28,26 +26,20 @@ export const verificationService = {
         body: JSON.stringify({ email, userName })
       });
 
-      console.log('✅ Response status:', response.status);
-      console.log('📬 Response ok:', response.ok);
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('❌ Backend error:', errorData);
         throw new Error(errorData.error || 'Failed to send verification code');
       }
 
       const data = await response.json();
-      console.log('✅ Backend response:', data);
       
       // ✅ Store code in localStorage instead of Firestore (no auth needed)
+      // 🔒 SECURITY: Do NOT log the verification code to console!
       localStorage.setItem('pendingVerificationCode', JSON.stringify({
         email,
         code: data.code,
         expiresAt: data.expiresAt
       }));
-
-      console.log('✅ Verification code sent and stored locally');
     } catch (error) {
       console.error('❌ Error sending verification code:', error);
       throw error;
@@ -57,12 +49,9 @@ export const verificationService = {
   // Verify code
   async verifyCode(email: string, code: string): Promise<boolean> {
     try {
-      console.log('🔍 Verifying code for:', email);
-      
       // Get code from localStorage
       const storedDataStr = localStorage.getItem('pendingVerificationCode');
       if (!storedDataStr) {
-        console.log('❌ No stored code found');
         return false;
       }
 
@@ -70,20 +59,17 @@ export const verificationService = {
       
       // Check if email matches
       if (storedData.email !== email) {
-        console.log('❌ Email mismatch');
         return false;
       }
       
       // Check if code matches
       if (storedData.code !== code) {
-        console.log('❌ Code mismatch');
         return false;
       }
       
       // Check if expired
       const now = Date.now();
       if (now > storedData.expiresAt) {
-        console.log('❌ Code expired');
         localStorage.removeItem('pendingVerificationCode');
         return false;
       }
@@ -91,7 +77,6 @@ export const verificationService = {
       // Code is valid - remove it
       localStorage.removeItem('pendingVerificationCode');
       
-      console.log('✅ Code verified successfully');
       return true;
     } catch (error) {
       console.error('❌ Error verifying code:', error);

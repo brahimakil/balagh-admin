@@ -603,7 +603,7 @@ const ImportsExports: React.FC = () => {
           ))}
         </div>
       </div>
-
+{/* 
       <div className="import-sections">
         <div className="section-header">
           <h2>📥 Import Data</h2>
@@ -681,7 +681,7 @@ const ImportsExports: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Import All Section */}
       <div className="import-sections" style={{ marginTop: '40px', borderTop: '2px solid #ddd', paddingTop: '40px' }}>

@@ -2852,64 +2852,64 @@ const Settings: React.FC = () => {
                         </div>
 
                         {/* Upload Media */}
-                        <div className="form-group">
-                          <label>Upload {section.type === 'photos' ? 'Images' : 'Videos'}</label>
-                          <input
-                            type="file"
-                            multiple
-                            accept={section.type === 'photos' ? 'image/*' : 'video/*'}
-                            onChange={(e) => {
-                              if (e.target.files) {
-                                handleSectionMediaUpload(section.id, e.target.files);
-                              }
-                            }}
-                          />
-                          
-                          {/* Show uploaded media */}
-                          {section.media && section.media.length > 0 && (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '10px' }}>
-                              {section.media.map((media, mediaIndex) => (
-                                <div key={mediaIndex} style={{ position: 'relative' }}>
-                                  {media.fileType === 'image' ? (
-                                    <img 
-                                      src={media.url} 
-                                      alt={media.fileName}
-                                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                    />
-                                  ) : (
-                                    <video 
-                                      src={media.url}
-                                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                      controls={false}
-                                    />
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newMedia = section.media!.filter((_, i) => i !== mediaIndex);
-                                      updateSection(section.id, { media: newMedia });
-                                    }}
-                                    style={{
-                                      position: 'absolute',
+                      <div className="form-group">
+                        <label>Upload {section.type === 'photos' ? 'Images' : 'Videos'}</label>
+                        <input
+                          type="file"
+                          multiple
+                          accept={section.type === 'photos' ? 'image/*' : 'video/*'}
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleSectionMediaUpload(section.id, e.target.files);
+                            }
+                          }}
+                        />
+                        
+                        {/* Show uploaded media */}
+                        {section.media && section.media.length > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                            {section.media.map((media, mediaIndex) => (
+                              <div key={mediaIndex} style={{ position: 'relative' }}>
+                                {media.fileType === 'image' ? (
+                                  <img 
+                                    src={media.url} 
+                                    alt={media.fileName}
+                                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                                  />
+                                ) : (
+                                  <video 
+                                    src={media.url}
+                                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                                    controls={false}
+                                  />
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newMedia = section.media!.filter((_, i) => i !== mediaIndex);
+                                    updateSection(section.id, { media: newMedia });
+                                  }}
+                                  style={{
+                                    position: 'absolute',
                                       top: '5px',
                                       right: '5px',
-                                      background: 'red',
-                                      color: 'white',
-                                      border: 'none',
-                                      borderRadius: '50%',
-                                      width: '20px',
-                                      height: '20px',
+                                    background: 'red',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '20px',
+                                    height: '20px',
                                       cursor: 'pointer',
                                       fontSize: '12px'
-                                    }}
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       </>
                     )}
                   </div>
@@ -2943,40 +2943,7 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* ========== BACKUP SECTION ========== */}
-      <div className="settings-section">
-        <div className="section-header">
-          <div>
-            <h2>💾 Backup & Export</h2>
-            <p>Download a complete backup of all system data</p>
-          </div>
-        </div>
-
-        <div className="backup-actions">
-          <button 
-            onClick={handleDownloadBackup}
-            disabled={loading}
-            className="btn-primary"
-            style={{ padding: '12px 24px', fontSize: '16px' }}
-          >
-            {loading ? '⏳ Generating Backup...' : '📥 Download Backup Now'}
-          </button>
-        </div>
-
-        <div className="info-box" style={{ marginTop: '20px' }}>
-          <p><strong>📋 Backup Contents:</strong></p>
-          <p>Creates an Excel file with all data from:</p>
-          <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
-            <li>✅ Martyrs & Wars</li>
-            <li>✅ Locations, Villages & Sectors</li>
-            <li>✅ Legends & Activities</li>
-            <li>✅ Activity Types & Dynamic Pages</li>
-            <li>✅ News & Stories</li>
-            <li>✅ Users & Settings</li>
-            <li>✅ Notifications</li>
-          </ul>
-        </div>
-      </div>
+    
 
       {/* Page Categories Management - NEW SECTION */}
       <div className="settings-section">
@@ -2985,7 +2952,7 @@ const Settings: React.FC = () => {
             <h3>📁 Page Categories Management</h3>
             <p>Create categories to organize your dynamic pages in the website header</p>
           </div>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => setShowCategoryForm(true)}
             disabled={loading}
@@ -2995,7 +2962,7 @@ const Settings: React.FC = () => {
         </div>
 
         {pageCategories.length === 0 ? (
-          <div style={{
+        <div style={{
             textAlign: 'center',
             padding: '40px',
             background: 'var(--surface-color)',
@@ -3011,10 +2978,10 @@ const Settings: React.FC = () => {
               <div 
                 key={category.id} 
                 style={{
-                  background: 'var(--surface-color)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '20px',
+          background: 'var(--surface-color)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '8px',
+          padding: '20px',
                   boxShadow: 'var(--shadow)'
                 }}
               >
@@ -3083,10 +3050,10 @@ const Settings: React.FC = () => {
                     placeholder="e.g., Sports"
                   />
                 </div>
-
-                <div className="form-group">
+          
+          <div className="form-group">
                   <label>Name (Arabic) *</label>
-                  <input
+              <input
                     type="text"
                     value={categoryFormData.nameAr}
                     onChange={(e) => handleCategoryFormChange('nameAr', e.target.value)}
@@ -3095,10 +3062,10 @@ const Settings: React.FC = () => {
                     placeholder="مثلاً، الرياضة"
                   />
                 </div>
-              </div>
+          </div>
 
               <div className="form-row">
-                <div className="form-group">
+              <div className="form-group">
                   <label>Description (English)</label>
                   <textarea
                     value={categoryFormData.descriptionEn}
@@ -3106,9 +3073,9 @@ const Settings: React.FC = () => {
                     rows={2}
                     placeholder="Optional description"
                   />
-                </div>
+              </div>
 
-                <div className="form-group">
+              <div className="form-group">
                   <label>Description (Arabic)</label>
                   <textarea
                     value={categoryFormData.descriptionAr}
@@ -3123,14 +3090,14 @@ const Settings: React.FC = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>Display Order</label>
-                  <input
+                <input
                     type="number"
                     value={categoryFormData.displayOrder}
                     onChange={(e) => handleCategoryFormChange('displayOrder', parseInt(e.target.value))}
                     min="0"
                   />
                   <small>Lower numbers appear first in the header</small>
-                </div>
+              </div>
 
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3155,8 +3122,44 @@ const Settings: React.FC = () => {
               </div>
             </form>
           </div>
+                </div>
+              )}
+
+  {/* ========== BACKUP SECTION ========== */}
+  <div className="settings-section">
+        <div className="section-header">
+          <div>
+            <h2>💾 Backup & Export</h2>
+            <p>Download a complete backup of all system data</p>
+          </div>
         </div>
-      )}
+
+        <div className="backup-actions">
+              <button
+            onClick={handleDownloadBackup}
+                disabled={loading}
+            className="btn-primary"
+            style={{ padding: '12px 24px', fontSize: '16px' }}
+              >
+            {loading ? '⏳ Generating Backup...' : '📥 Download Backup Now'}
+              </button>
+        </div>
+
+        <div className="info-box" style={{ marginTop: '20px' }}>
+          <p><strong>📋 Backup Contents:</strong></p>
+          <p>Creates an Excel file with all data from:</p>
+          <ul style={{ marginTop: '10px', marginLeft: '20px' }}>
+            <li>✅ Martyrs & Wars</li>
+            <li>✅ Locations, Villages & Sectors</li>
+            <li>✅ Legends & Activities</li>
+            <li>✅ Activity Types & Dynamic Pages</li>
+            <li>✅ News & Stories</li>
+            <li>✅ Users & Settings</li>
+            <li>✅ Notifications</li>
+          </ul>
+          </div>
+        </div>
+
     </div>
   );
 }; // This closes the Settings function

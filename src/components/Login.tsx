@@ -87,7 +87,6 @@ const Login: React.FC<LoginProps> = () => {
       await auth.signOut();
       
       // Send verification code
-      console.log('✅ Credentials verified, sending verification code...');
       await verificationService.sendVerificationCode(email, userData.fullName || userData.name);
       
       // Store credentials and show code input form
@@ -97,18 +96,22 @@ const Login: React.FC<LoginProps> = () => {
       setLoading(false);
       
     } catch (error: any) {
-      console.error('Login error:', error);
       localStorage.removeItem('verifying2FA');
       setLoading(false);
       
+      // 🔒 User-friendly error messages (no technical details in console)
       if (error.code === 'auth/user-not-found') {
-        setError('No account found with this email');
-      } else if (error.code === 'auth/wrong-password') {
-        setError('Incorrect password');
+        setError('❌ No account found with this email address');
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setError('❌ Invalid email or password. Please check your credentials and try again.');
       } else if (error.code === 'auth/too-many-requests') {
-        setError('Too many failed attempts. Please try again later.');
+        setError('⚠️ Too many failed login attempts. Please try again later or reset your password.');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('❌ Invalid email format. Please enter a valid email address.');
+      } else if (error.code === 'auth/user-disabled') {
+        setError('🚫 This account has been disabled. Please contact the administrator.');
       } else {
-        setError('Failed to send verification code. Please try again.');
+        setError('❌ Login failed. Please check your credentials and try again.');
       }
     }
   };
@@ -140,13 +143,23 @@ const Login: React.FC<LoginProps> = () => {
       // Code is valid, complete the login
       await signInWithEmailAndPassword(auth, pendingCredentials.email, pendingCredentials.password);
       
-      console.log('✅ 2FA verification successful, logging in...');
+      // Navigate to dashboard
       navigate('/admin/dashboard');
       
     } catch (error: any) {
-      console.error('Verification error:', error);
       setLoading(false);
-      setError('Failed to verify code. Please try again.');
+      
+      // User-friendly error messages
+      if (error.code === 'auth/invalid-credential') {
+        setError('❌ Session expired. Please start over and request a new code.');
+        setTimeout(() => {
+          setShowCodeInput(false);
+          setPendingCredentials(null);
+          setVerificationCode('');
+        }, 2000);
+      } else {
+        setError('❌ Verification failed. Please try again or request a new code.');
+      }
     }
   };
 
@@ -166,13 +179,31 @@ const Login: React.FC<LoginProps> = () => {
       await verificationService.sendVerificationCode(pendingCredentials.email, userData?.fullName || userData?.name);
       setResendCooldown(60);
       setLoading(false);
-      setError('New code sent! Please check your email.');
       
-      setTimeout(() => setError(''), 3000);
+      // Show success message temporarily (green background)
+      const successDiv = document.createElement('div');
+      successDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 9999;
+        font-weight: 600;
+      `;
+      successDiv.textContent = '✅ New code sent! Check your email.';
+      document.body.appendChild(successDiv);
+      
+      setTimeout(() => {
+        successDiv.remove();
+      }, 3000);
+      
     } catch (error) {
-      console.error('Resend error:', error);
       setLoading(false);
-      setError('Failed to resend code');
+      setError('❌ Failed to resend code. Please try again or contact support.');
     }
   };
 

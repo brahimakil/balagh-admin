@@ -43,18 +43,20 @@ const Admins: React.FC = () => {
       martyrs: false,
       wars: false,
       locations: false,
+      sectors: false,
       villages: false,
       activities: false,
       activityTypes: false,
       news: false,
       liveNews: false,
+      pressNews: false,
       notifications: false,
       legends: false,
       admins: false,
       settings: false,
       martyrsStories: false,
-      importsExports: false, // ✅ ADDED: importsExports permission
-      whatsapp: false, // ✅ ADDED: whatsapp permission
+      importsExports: false,
+      whatsapp: false,
     } as UserPermissions,
     assignedVillageId: '',
   });
@@ -135,7 +137,8 @@ const Admins: React.FC = () => {
         lastName: formData.lastName,
         role: formData.role,
         permissions: formData.permissions,
-        assignedVillageId: formData.assignedVillageId || undefined, // ✅ ADD THIS
+        // ✅ FIX: Explicitly pass empty string so updateUser can delete the field
+        assignedVillageId: formData.assignedVillageId === '' ? '' : formData.assignedVillageId,
       };
 
       if (editingAdmin) {
@@ -180,18 +183,20 @@ const Admins: React.FC = () => {
         martyrs: false,
         wars: false,
         locations: false,
-        villages: false, // ✅ NEW
+        sectors: false,
+        villages: false,
         activities: false,
         activityTypes: false,
         news: false,
         liveNews: false,
+        pressNews: false,
         notifications: false,
         legends: false,
         admins: false,
         settings: false,
-        martyrsStories: false, // ✅ ADD THIS
-        importsExports: false, // ✅ ADD THIS
-        whatsapp: false, // ✅ ADD THIS
+        martyrsStories: false,
+        importsExports: false,
+        whatsapp: false,
       },
       assignedVillageId: '', // Reset assignedVillageId
     });
@@ -204,6 +209,14 @@ const Admins: React.FC = () => {
   };
 
   const handleEdit = (admin: User) => {
+    console.log('🔍 EDITING ADMIN:', {
+      email: admin.email,
+      role: admin.role,
+      assignedVillageId: admin.assignedVillageId,
+      hasVillage: !!admin.assignedVillageId,
+      villageValue: admin.assignedVillageId || ''
+    });
+    
     setFormData({
       email: admin.email,
       password: '',
@@ -216,21 +229,25 @@ const Admins: React.FC = () => {
         martyrs: false,
         wars: false,
         locations: false,
-        villages: false, // ✅ NEW
+        sectors: false,
+        villages: false,
         activities: false,
         activityTypes: false,
         news: false,
         liveNews: false,
+        pressNews: false,
         notifications: false,
         legends: false,
         admins: false,
         settings: false,
-        martyrsStories: false, // ✅ ADD THIS
-        importsExports: false, // ✅ ADD THIS
-        whatsapp: false, // ✅ ADD THIS
+        martyrsStories: false,
+        importsExports: false,
+        whatsapp: false,
       },
-      assignedVillageId: admin.assignedVillageId || '', // Set assignedVillageId for editing
+      // ✅ FIX: Explicitly convert undefined/null to empty string
+      assignedVillageId: admin.assignedVillageId ? admin.assignedVillageId : '',
     });
+    
     setImagePreview(admin.profilePhoto || '');
     setSelectedProfilePhotoFile(null);
     setEditingAdmin(admin);
@@ -476,12 +493,13 @@ const Admins: React.FC = () => {
                       {formData.role === 'village_editor' && <span style={{ color: 'red' }}>*</span>}
                     </label>
                     <select
-                      value={formData.assignedVillageId}
+                      value={formData.assignedVillageId || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, assignedVillageId: e.target.value }))}
                       required={formData.role === 'village_editor'}
                     >
-                      {formData.role === 'secondary' && <option value="">No Village</option>}
-                      {formData.role === 'village_editor' && <option value="">-- Select a Village --</option>}
+                      <option value="">
+                        {formData.role === 'village_editor' ? '-- Select a Village --' : 'No Village'}
+                      </option>
                       {villages.map(village => (
                         <option key={village.id} value={village.id}>
                           {village.nameEn} - {village.nameAr}
@@ -528,18 +546,20 @@ const Admins: React.FC = () => {
                             martyrs: 'Martyrs',
                             wars: '⚔️ Wars',
                             locations: 'Locations',
-                            sectors: 'Sectors (قطاعات)', // ← ADD THIS LINE
+                            sectors: 'Sectors (قطاعات)',
                             villages: 'Villages',
                             activities: 'Activities',
                             activityTypes: 'Activity Types',
                             news: 'News',
+                            liveNews: '🔴 Live News',
+                            pressNews: '📄 Press News',
                             notifications: 'Notifications',
                             legends: 'Legends',
                             admins: 'Admins Management',
                             settings: 'Website Settings',
-                            martyrsStories: 'Martyrs Stories', // ✅ ADD THIS
-                            importsExports: 'Imports/Exports', // ✅ ADD THIS
-                            whatsapp: 'WhatsApp Management', // ✅ ADD THIS
+                            martyrsStories: 'Martyrs Stories',
+                            importsExports: 'Imports/Exports',
+                            whatsapp: 'WhatsApp Management',
                           }).map(([key, label]) => (
                             <label key={key} className="permission-checkbox">
                               <input

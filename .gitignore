@@ -26,6 +26,8 @@ db-management
 *.sln
 *.sw?
 
+FIREBASE_FALLBACK_README.md
+
 # Environment variables
 .env
 .env.local

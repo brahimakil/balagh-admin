@@ -258,13 +258,7 @@ export const notificationsService = {
     console.log('👤 User role:', currentUserData?.role);
     console.log('🏘️ Assigned village:', currentUserData?.assignedVillageId);
     
-    // ✅ FIX: Early return if user has no notifications permission
-    if (currentUserData?.role === 'village_editor') {
-      console.log('🚫 Village editor - no notifications');
-      callback([], 0);
-      return () => {}; // Return empty unsubscribe function
-    }
-    
+    // ✅ FIX: Early return only if secondary admin has no notifications permission
     if (currentUserData?.role === 'secondary' && !currentUserData?.permissions?.notifications) {
       console.log('❌ Secondary admin without notifications permission');
       callback([], 0);
@@ -366,9 +360,31 @@ export const notificationsService = {
             }
             
           } else if (currentUserData?.role === 'village_editor') {
-            // 🚫 VILLAGE EDITOR: No notifications
-            filteredNotifications = [];
-            console.log('🚫 Village editor - no notifications');
+            // 👤 VILLAGE EDITOR: Only notifications from their village
+            const assignedVillageId = currentUserData?.assignedVillageId;
+            
+            if (assignedVillageId) {
+              console.log('👤 Village editor - filtering for village:', assignedVillageId);
+              
+              try {
+                // Get users from the same village (secondary admins + other village editors)
+                const sameVillageUsers = await this.getUsersFromSameVillage(assignedVillageId);
+                const sameVillageEmails = sameVillageUsers.map(user => user.email);
+                
+                filteredNotifications = allNotifications.filter(notification => 
+                  sameVillageEmails.includes(notification.performedBy)
+                );
+                console.log('👥 Same village users:', sameVillageEmails);
+                console.log('📋 Village editor notifications:', filteredNotifications.length);
+              } catch (error) {
+                console.error('❌ Error filtering village editor notifications:', error);
+                filteredNotifications = [];
+              }
+            } else {
+              // No village assigned - no notifications
+              filteredNotifications = [];
+              console.log('❌ Village editor without assigned village - no notifications');
+            }
           }
           
           console.log('📋 Final filtered notifications:', filteredNotifications.length);

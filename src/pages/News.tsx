@@ -547,22 +547,27 @@ const NewsPage: React.FC<NewsProps> = ({
             
             <div className="form-container">
               <form onSubmit={handleSubmit}>
-                {/* News Type */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>News Type</label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => handleInputChange('type', e.target.value)}
-                      required
-                    >
-                      {!isLiveNewsOnly && ( // ✅ Only show Regular option when NOT in Live News page
-                        <option value="regular">Regular News (added as regular news, not live)</option>
-                      )}
-                      <option value="live">Live News (stays live, manual expiration)</option>
-                      <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
-                    </select>
-                  </div>
+                 {/* News Type */}
+                 <div className="form-row">
+                   <div className="form-group">
+                     <label>News Type</label>
+                     <select
+                       value={formData.type}
+                       onChange={(e) => handleInputChange('type', e.target.value)}
+                       required
+                       disabled={!isLiveNewsOnly && !isPressNewsOnly} // ✅ Only disable in regular News page
+                     >
+                       {!isLiveNewsOnly && ( // ✅ Only show Regular option when NOT in Live News page
+                         <option value="regular">Regular News</option>
+                       )}
+                       {(isLiveNewsOnly || isPressNewsOnly) && ( // ✅ Only show Live options in Live/Press News pages
+                         <>
+                           <option value="live">Live News (stays live, manual expiration)</option>
+                           <option value="regularLive">Regular Live News (auto-deletes after duration)</option>
+                         </>
+                       )}
+                     </select>
+                   </div>
                   
                   {(formData.type === 'live' || formData.type === 'regularLive') && (
                     <div className="form-group">

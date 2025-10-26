@@ -14,6 +14,12 @@ const Wars: React.FC = () => {
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  // ✅ Add these for showing existing media
+  const [existingPhotos, setExistingPhotos] = useState<any[]>([]);
+  const [existingVideos, setExistingVideos] = useState<any[]>([]);
+  // ✅ Track which existing media to remove
+  const [photosToRemove, setPhotosToRemove] = useState<string[]>([]);
+  const [videosToRemove, setVideosToRemove] = useState<string[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -77,14 +83,18 @@ const Wars: React.FC = () => {
       endDate: '',
       mainImage: ''
     });
+    setImagePreview('');
     setEditingWar(null);
     setShowForm(false);
-    setImagePreview('');
-    setSelectedMainImageFile(null);
     setSelectedPhotos([]);
     setSelectedVideos([]);
+    setSelectedMainImageFile(null);
+    setExistingPhotos([]);
+    setExistingVideos([]);
+    // ✅ Clear removal lists
+    setPhotosToRemove([]);
+    setVideosToRemove([]);
     setError('');
-    setSuccess('');
   };
 
   const handleTranslate = async (field: string, direction: 'toAr' | 'toEn') => {
@@ -176,7 +186,10 @@ const Wars: React.FC = () => {
           currentUserData?.fullName,
           selectedPhotos.length > 0 ? selectedPhotos : undefined,
           selectedVideos.length > 0 ? selectedVideos : undefined,
-          selectedMainImageFile || undefined
+          selectedMainImageFile || undefined,
+          // ✅ Pass the removal lists
+          photosToRemove.length > 0 ? photosToRemove : undefined,
+          videosToRemove.length > 0 ? videosToRemove : undefined
         );
         setSuccess('War updated successfully!');
       } else {
@@ -203,17 +216,20 @@ const Wars: React.FC = () => {
   };
 
   const handleEdit = (war: War) => {
+    setEditingWar(war);
     setFormData({
       nameEn: war.nameEn,
       nameAr: war.nameAr,
       descriptionEn: war.descriptionEn,
       descriptionAr: war.descriptionAr,
-      startDate: war.startDate.toISOString().split('T')[0],
-      endDate: war.endDate ? war.endDate.toISOString().split('T')[0] : '',
-      mainImage: war.mainImage
+      startDate: war.startDate?.toISOString().split('T')[0] || '',
+      endDate: war.endDate?.toISOString().split('T')[0] || '',
+      mainImage: war.mainImage || ''
     });
-    setImagePreview(war.mainImage);
-    setEditingWar(war);
+    setImagePreview(war.mainImage || '');
+    // ✅ Load existing media
+    setExistingPhotos(war.photos || []);
+    setExistingVideos(war.videos || []);
     setShowForm(true);
   };
 
@@ -282,6 +298,16 @@ const Wars: React.FC = () => {
       setError(`Failed to delete ${fileType}. Please try again.`);
       console.error(`Error deleting ${fileType}:`, error);
     }
+  };
+
+  const removeExistingPhoto = (photoUrl: string) => {
+    setPhotosToRemove(prev => [...prev, photoUrl]);
+    setExistingPhotos(prev => prev.filter(p => (p.url || p.downloadURL) !== photoUrl));
+  };
+
+  const removeExistingVideo = (videoUrl: string) => {
+    setVideosToRemove(prev => [...prev, videoUrl]);
+    setExistingVideos(prev => prev.filter(v => (v.url || v.downloadURL) !== videoUrl));
   };
 
   if (loading && !showForm) {
@@ -447,14 +473,35 @@ const Wars: React.FC = () => {
                     className="file-input"
                   />
                   {imagePreview && (
-                    <div className="image-preview">
-                      <img src={imagePreview} alt="Main preview" />
+                    <div style={{ position: 'relative', marginTop: '10px', maxWidth: '300px' }}>
+                      <img 
+                        src={imagePreview} 
+                        alt="Main preview" 
+                        style={{ 
+                          width: '100%', 
+                          borderRadius: '8px', 
+                          border: '2px solid #ddd' 
+                        }} 
+                      />
                       <button
                         type="button"
-                        className="remove-image-btn"
                         onClick={handleRemoveMainImage}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }}
                       >
-                        Remove
+                        ✕ Remove
                       </button>
                     </div>
                   )}
@@ -473,19 +520,55 @@ const Wars: React.FC = () => {
                   />
                   {selectedPhotos.length > 0 && (
                     <div className="selected-files">
-                      <h4>Selected Photos:</h4>
-                      {selectedPhotos.map((file, index) => (
-                        <div key={index} className="file-item">
-                          <span>📸 {file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSelectedPhoto(index)}
-                            className="remove-file-btn"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                      <h4>Selected Photos ({selectedPhotos.length}):</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        {selectedPhotos.map((file, index) => (
+                          <div key={index} style={{ position: 'relative', border: '2px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+                            <img 
+                              src={URL.createObjectURL(file)} 
+                              alt={file.name}
+                              style={{ width: '100%', height: '120px', objectFit: 'cover' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedPhoto(index)}
+                              style={{
+                                position: 'absolute',
+                                top: '5px',
+                                right: '5px',
+                                background: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '24px',
+                                height: '24px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              ✕
+                            </button>
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              background: 'rgba(0,0,0,0.7)',
+                              color: 'white',
+                              padding: '4px',
+                              fontSize: '10px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              📸 {file.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -503,23 +586,175 @@ const Wars: React.FC = () => {
                   />
                   {selectedVideos.length > 0 && (
                     <div className="selected-files">
-                      <h4>Selected Videos:</h4>
-                      {selectedVideos.map((file, index) => (
-                        <div key={index} className="file-item">
-                          <span>🎥 {file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSelectedVideo(index)}
-                            className="remove-file-btn"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                      <h4>Selected Videos ({selectedVideos.length}):</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        {selectedVideos.map((file, index) => (
+                          <div key={index} style={{ position: 'relative', border: '2px solid #ddd', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>
+                            <video 
+                              src={URL.createObjectURL(file)} 
+                              style={{ width: '100%', height: '120px', objectFit: 'contain' }}
+                              controls
+                              muted
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedVideo(index)}
+                              style={{
+                                position: 'absolute',
+                                top: '5px',
+                                right: '5px',
+                                background: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '24px',
+                                height: '24px',
+                                cursor: 'pointer',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 10
+                              }}
+                            >
+                              ✕
+                            </button>
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              background: 'rgba(0,0,0,0.8)',
+                              color: 'white',
+                              padding: '4px',
+                              fontSize: '10px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              🎬 {file.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
+
+                  {/* ✅ Show existing photos when editing */}
+                  {editingWar && existingPhotos.length > 0 && (
+                    <div className="selected-files" style={{ marginTop: '15px' }}>
+                      <h4>Existing Photos ({existingPhotos.length}):</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        {existingPhotos.map((photo, index) => {
+                          const photoUrl = photo.url || photo.downloadURL;
+                          return (
+                            <div key={index} style={{ position: 'relative', border: '2px solid #28a745', borderRadius: '8px', overflow: 'hidden' }}>
+                              <img 
+                                src={photoUrl} 
+                                alt={`Photo ${index + 1}`}
+                                style={{ width: '100%', height: '120px', objectFit: 'cover' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeExistingPhoto(photoUrl)}
+                                style={{
+                                  position: 'absolute',
+                                  top: '5px',
+                                  right: '5px',
+                                  background: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '24px',
+                                  height: '24px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                ✕
+                              </button>
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(40,167,69,0.9)',
+                                color: 'white',
+                                padding: '4px',
+                                fontSize: '10px',
+                                textAlign: 'center'
+                              }}>
+                                ✅ Saved
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ✅ Show existing videos when editing */}
+                  {editingWar && existingVideos.length > 0 && (
+                    <div className="selected-files" style={{ marginTop: '15px' }}>
+                      <h4>Existing Videos ({existingVideos.length}):</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginTop: '10px' }}>
+                        {existingVideos.map((video, index) => {
+                          const videoUrl = video.url || video.downloadURL;
+                          return (
+                            <div key={index} style={{ position: 'relative', border: '2px solid #28a745', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>
+                              <video 
+                                src={videoUrl} 
+                                style={{ width: '100%', height: '120px', objectFit: 'contain' }}
+                                controls
+                                muted
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeExistingVideo(videoUrl)}
+                                style={{
+                                  position: 'absolute',
+                                  top: '5px',
+                                  right: '5px',
+                                  background: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '50%',
+                                  width: '24px',
+                                  height: '24px',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  zIndex: 10
+                                }}
+                              >
+                                ✕
+                              </button>
+                              <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                background: 'rgba(40,167,69,0.9)',
+                                color: 'white',
+                                padding: '4px',
+                                fontSize: '10px',
+                                textAlign: 'center'
+                              }}>
+                                ✅ Saved
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
               <div className="form-actions">
                 <button type="button" className="cancel-btn" onClick={resetForm}>

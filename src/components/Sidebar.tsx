@@ -107,8 +107,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: '📰',
       permission: 'news',
       children: [
-        { id: 'live-news', label: 'Live News', icon: '🔴', permission: 'news' },
-        { id: 'press-news', label: 'Press News', icon: '📄', permission: 'news' }
+        { id: 'live-news', label: 'Live News', icon: '🔴', permission: 'liveNews' },
+        { id: 'press-news', label: 'Press News', icon: '📄', permission: 'pressNews' }
       ]
     },
     { 
@@ -143,9 +143,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Filter menu items based on permissions
   const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
     return items.filter(item => {
-    if (!currentUserData) return false;
+      if (!currentUserData) return false;
       if (currentUserData.role === 'main') return true;
-      return hasPermission(item.permission);
+      
+      // Check if user has permission for this item
+      const hasItemPermission = hasPermission(item.permission);
+      
+      // If item has children, check if user has permission for ANY child
+      if (item.children && item.children.length > 0) {
+        const hasAnyChildPermission = item.children.some(child => hasPermission(child.permission));
+        // Show parent if user has parent permission OR any child permission
+        return hasItemPermission || hasAnyChildPermission;
+      }
+      
+      return hasItemPermission;
     }).map(item => ({
       ...item,
       children: item.children ? filterMenuItems(item.children) : undefined

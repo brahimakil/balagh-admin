@@ -235,44 +235,32 @@ class SectorsService {
   // 📍 GET UNASSIGNED LOCATIONS (for sector creation)
   async getUnassignedLocations(): Promise<any[]> {
     try {
-      const { collection, getDocs, query, where, orderBy } = await import('firebase/firestore');
+      const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
       const { db } = await import('../firebase');
       
+      // Get all locations and filter in memory
+      // (Firestore doesn't support OR queries for null/undefined easily)
       const q = query(
         collection(db, 'locations'),
-        where('sectorId', '==', null),
         orderBy('nameEn', 'asc')
       );
       
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      }));
-    } catch (error) {
-      // If sectorId field doesn't exist, get all locations
-      try {
-        const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
-        const { db } = await import('../firebase');
-        
-        const q = query(
-          collection(db, 'locations'),
-          orderBy('nameEn', 'asc')
-        );
-        
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
+      
+      // ✅ Filter to only include locations with no sectorId or sectorId === null
+      const unassignedLocations = querySnapshot.docs
+        .map(doc => ({
           id: doc.id,
           ...doc.data(),
           createdAt: doc.data().createdAt?.toDate() || new Date(),
           updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        }));
-      } catch (fallbackError) {
-        console.error('Error getting unassigned locations:', fallbackError);
-        throw fallbackError;
-      }
+        }))
+        .filter(location => !location.sectorId || location.sectorId === null);
+      
+      return unassignedLocations;
+    } catch (error) {
+      console.error('Error getting unassigned locations:', error);
+      return [];
     }
   }
 

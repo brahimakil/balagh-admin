@@ -178,10 +178,19 @@ export const warsService = {
     currentUserName?: string,
     photoFiles?: File[],
     videoFiles?: File[],
-    mainImageFile?: File
+    mainImageFile?: File,
+    photosToRemove?: string[],
+    videosToRemove?: string[]
   ): Promise<void> {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
+      
+      // ✅ FETCH THE CURRENT WAR FROM DATABASE FIRST
+      const currentWarDoc = await getDoc(docRef);
+      if (!currentWarDoc.exists()) {
+        throw new Error('War not found');
+      }
+      const currentWarData = currentWarDoc.data();
       
       // Upload main image if provided
       let mainImageUrl = war.mainImage; // Keep existing if no new file
@@ -205,9 +214,53 @@ export const warsService = {
         newVideos = await fileUploadService.uploadMultipleFiles(videoFiles, videoFolderPath);
       }
 
-      // Combine existing and new files
-      const updatedPhotos = [...(war.photos || []), ...newPhotos];
-      const updatedVideos = [...(war.videos || []), ...newVideos];
+      // ✅ GET EXISTING MEDIA FROM DATABASE (NOT FROM FORM DATA)
+      let existingPhotos = currentWarData.photos || [];
+      let existingVideos = currentWarData.videos || [];
+      
+      console.log('📸 Existing photos before removal:', existingPhotos.length);
+      console.log('🎥 Existing videos before removal:', existingVideos.length);
+      console.log('🗑️ Photos to remove:', photosToRemove);
+      console.log('🗑️ Videos to remove:', videosToRemove);
+      
+      if (photosToRemove && photosToRemove.length > 0) {
+        existingPhotos = existingPhotos.filter(photo => {
+          const photoUrl = photo.url || photo.downloadURL;
+          return !photosToRemove.includes(photoUrl);
+        });
+        
+        console.log('✅ Photos after removal:', existingPhotos.length);
+        
+        // Delete removed photos from storage
+        try {
+          await fileUploadService.deleteMultipleFiles(photosToRemove);
+        } catch (deleteError) {
+          console.warn('Could not delete some photos from storage:', deleteError);
+        }
+      }
+      
+      if (videosToRemove && videosToRemove.length > 0) {
+        existingVideos = existingVideos.filter(video => {
+          const videoUrl = video.url || video.downloadURL;
+          return !videosToRemove.includes(videoUrl);
+        });
+        
+        console.log('✅ Videos after removal:', existingVideos.length);
+        
+        // Delete removed videos from storage
+        try {
+          await fileUploadService.deleteMultipleFiles(videosToRemove);
+        } catch (deleteError) {
+          console.warn('Could not delete some videos from storage:', deleteError);
+        }
+      }
+
+      // Combine existing (after removal) and new files
+      const updatedPhotos = [...existingPhotos, ...newPhotos];
+      const updatedVideos = [...existingVideos, ...newVideos];
+      
+      console.log('📊 Final photos count:', updatedPhotos.length);
+      console.log('📊 Final videos count:', updatedVideos.length);
 
       await updateDoc(docRef, {
         nameEn: war.nameEn,

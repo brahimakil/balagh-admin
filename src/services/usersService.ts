@@ -3,6 +3,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  deleteField,
   doc, 
   getDocs, 
   getDoc,
@@ -28,6 +29,8 @@ export interface UserPermissions {
   activities: boolean;
   activityTypes: boolean;
   news: boolean;
+  liveNews: boolean;
+  pressNews: boolean;
   notifications: boolean;
   legends: boolean;
   admins: boolean;
@@ -175,11 +178,13 @@ export const usersService = {
             martyrs: true,
             wars: true,
             locations: true,
+            sectors: true,
             villages: true,
             activities: true,
             activityTypes: true,
             news: true,
             liveNews: true,
+            pressNews: true,
             notifications: true,
             legends: true,
             admins: true,
@@ -196,11 +201,13 @@ export const usersService = {
               martyrs: false,
               wars: false,
               locations: false,
+              sectors: false,
               villages: false,
               activities: true, // ONLY activities for their assigned village
               activityTypes: false,
               news: false,
               liveNews: false,
+              pressNews: false,
               notifications: true,
               legends: false,
               admins: false,
@@ -216,11 +223,13 @@ export const usersService = {
               martyrs: false,
               wars: false,
               locations: false,
+              sectors: false,
               villages: false,
               activities: false,
               activityTypes: false,
               news: false,
               liveNews: false,
+              pressNews: false,
               notifications: true, // ✅ CHANGE: Give notifications permission
               legends: false,
               admins: false,
@@ -237,12 +246,14 @@ export const usersService = {
             martyrs: false,
             wars: false,
             locations: false,
+            sectors: false,
             villages: false,
             activities: true,
             activityTypes: false,
             news: false,
             liveNews: false,
-            notifications: false,
+            pressNews: false,
+            notifications: true, // ✅ Village editors can see their village notifications
             legends: false,
             admins: false,
             settings: false,
@@ -257,11 +268,13 @@ export const usersService = {
             martyrs: false,
             wars: false,
             locations: false,
+            sectors: false,
             villages: false,
             activities: false,
             activityTypes: false,
             news: false,
             liveNews: false,
+            pressNews: false,
             notifications: false,
             legends: false,
             admins: false,
@@ -273,6 +286,9 @@ export const usersService = {
         }
       };
       
+      // ✅ Check if permissions object has at least one true value
+      const hasAnyPermission = userData.permissions && Object.values(userData.permissions).some(val => val === true);
+      
       await setDoc(doc(db, COLLECTION_NAME, userCredential.user.uid), {
         email: userData.email,
         firstName: userData.firstName,
@@ -280,9 +296,9 @@ export const usersService = {
         fullName: fullName || userData.email,
         role: userData.role,
         profilePhoto: profilePhotoUrl,
-        // ✅ FIX: Use manual permissions for secondary without village
-        permissions: userData.role === 'secondary' && !userData.assignedVillageId 
-          ? userData.permissions || getDefaultPermissions(userData.role, userData.assignedVillageId)
+        // ✅ FIX: Use manual permissions for secondary if at least one is checked, otherwise use defaults
+        permissions: userData.role === 'secondary' && hasAnyPermission
+          ? userData.permissions
           : getDefaultPermissions(userData.role, userData.assignedVillageId),
         // ✅ FIX: Only add assignedVillageId if it has a value
         ...(userData.assignedVillageId && { assignedVillageId: userData.assignedVillageId }),
@@ -338,14 +354,41 @@ export const usersService = {
         updateData.profilePhoto = profilePhotoUrl;
       }
 
-      // ✅ FIX: Handle assignedVillageId properly
+      // ✅ FIX: Handle assignedVillageId properly - use deleteField() to actually remove it
       if (userData.assignedVillageId !== undefined) {
         if (userData.assignedVillageId === null || userData.assignedVillageId === '') {
-          // Remove the field if it's null or empty string
-          updateData.assignedVillageId = null;
+          // Actually DELETE the field from Firestore (not just set to null)
+          console.log('🗑️ DELETING assignedVillageId field from user document');
+          updateData.assignedVillageId = deleteField();
         } else {
           // Only set if it has a valid value
+          console.log('✅ Setting assignedVillageId to:', userData.assignedVillageId);
           updateData.assignedVillageId = userData.assignedVillageId;
+          
+          // ✅ NEW: If assigning a village to a secondary admin, auto-set permissions
+          if (userData.role === 'secondary') {
+            console.log('🏘️ Secondary admin with village - setting default permissions');
+            updateData.permissions = {
+              dashboard: true,
+              martyrs: false,
+              wars: false,
+              locations: false,
+              sectors: false,
+              villages: false,
+              activities: true, // ONLY activities for their assigned village
+              activityTypes: false,
+              news: false,
+              liveNews: false,
+              pressNews: false,
+              notifications: true,
+              legends: false,
+              admins: false,
+              settings: false,
+              martyrsStories: false,
+              importsExports: false,
+              whatsapp: false,
+            };
+          }
         }
       }
 
