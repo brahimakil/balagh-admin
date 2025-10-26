@@ -79,7 +79,7 @@ export const youtubeService = {
     }
   },
 
-  // Upload video to YouTube (using resumable upload - no CORS!)
+  // Upload video to YouTube (using backend proxy to avoid CORS)
   async uploadVideo(options: YouTubeUploadOptions) {
     const credentials = await this.getCredentials();
     if (!credentials?.youtubeAccessToken) {
@@ -87,7 +87,12 @@ export const youtubeService = {
     }
 
     try {
-      console.log('📤 Uploading to YouTube...');
+      console.log('📤 Uploading to YouTube via backend proxy...');
+
+      // Backend API URL
+      const BACKEND_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001'
+        : 'https://balaghemailbackend.vercel.app';
 
       // Step 1: Create metadata
       const metadata = {
@@ -102,52 +107,41 @@ export const youtubeService = {
         }
       };
 
-      // Step 2: Initialize resumable upload session
-      const initResponse = await axios.post(
-        'https://www.googleapis.com/upload/youtube/v3/videos',
+      // Step 2: Initialize resumable upload session via backend
+      console.log('🔄 Initializing upload session...');
+      const initResponse = await axios.post(`${BACKEND_URL}/api/youtube/upload`, {
+        action: 'init',
         metadata,
-        {
-          params: {
-            uploadType: 'resumable',
-            part: 'snippet,status',
-            access_token: credentials.youtubeAccessToken
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Upload-Content-Type': 'video/*'
-          }
-        }
-      );
+        accessToken: credentials.youtubeAccessToken
+      });
 
-      const uploadUrl = initResponse.headers['location'];
+      if (!initResponse.data.success) {
+        throw new Error(initResponse.data.error || 'Failed to initialize upload');
+      }
 
-      // Step 3: Upload video from URL directly
-      // First, fetch the video as a blob
-      const videoBlob = await fetch(options.videoUrl).then(r => r.blob());      
-      console.log(`📤 Uploading ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB...`);
+      const uploadUrl = initResponse.data.uploadUrl;
+      console.log('✅ Upload session initialized');
 
-      const uploadResponse = await axios.put(
-        uploadUrl,
-        videoBlob,
-        {
-          headers: {
-            'Content-Type': 'video/*'
-          },
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          timeout: 600000, // 10 minutes
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-            console.log(`📊 Upload progress: ${percentCompleted}%`);
-          }
-        }
-      );
+      // Step 3: Upload video via backend (backend fetches from Firebase and uploads to YouTube)
+      console.log('📤 Uploading video...');
+      const uploadResponse = await axios.post(`${BACKEND_URL}/api/youtube/upload`, {
+        action: 'upload',
+        videoUrl: options.videoUrl,
+        uploadUrl
+      }, {
+        timeout: 600000 // 10 minutes
+      });
 
+      if (!uploadResponse.data.success) {
+        throw new Error(uploadResponse.data.error || 'Failed to upload video');
+      }
+
+      console.log('✅ Video uploaded successfully!');
       return {
         success: true,
-        videoId: uploadResponse.data.id,
+        videoId: uploadResponse.data.videoId,
         platform: 'youtube',
-        url: `https://www.youtube.com/watch?v=${uploadResponse.data.id}`
+        url: uploadResponse.data.videoUrl
       };
     } catch (error: any) {
       const errorMessage = error.response?.data?.error?.message || error.message;
