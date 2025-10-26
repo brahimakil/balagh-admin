@@ -305,7 +305,9 @@ const Martyrs: React.FC = () => {
           const qrCodeWithLogo = await generatePrintQualityQRCode({
             id: editingMartyr.id,
             nameEn: martyrData.nameEn,
-            nameAr: martyrData.nameAr
+            nameAr: martyrData.nameAr,
+            jihadistNameEn: martyrData.jihadistNameEn,
+            jihadistNameAr: martyrData.jihadistNameAr
           }, logoPath);
           
           martyrData.qrCode = qrCodeWithLogo;
@@ -329,7 +331,9 @@ const Martyrs: React.FC = () => {
           qrCodeWithLogo = await generatePrintQualityQRCode({
             id: 'temp',
             nameEn: martyrData.nameEn,
-            nameAr: martyrData.nameAr
+            nameAr: martyrData.nameAr,
+            jihadistNameEn: martyrData.jihadistNameEn,
+            jihadistNameAr: martyrData.jihadistNameAr
           }, logoPath);
         } catch (qrError) {
           console.warn('QR code generation failed during creation:', qrError);
